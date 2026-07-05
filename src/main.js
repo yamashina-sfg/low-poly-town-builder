@@ -1,7 +1,10 @@
 import * as THREE from 'three';
-import { createTerrain, setTileHighlighted, GROUND_SIZE } from './terrain.js';
+import { createTerrain, setTileHighlighted, getTile, GROUND_SIZE, TILE_SIZE } from './terrain.js';
 import { showBuildMenu, hideBuildMenu } from './buildMenu.js';
 import { generateBuilding, generateTree } from './generators.js';
+import { generateRoad, computeRoadConnections } from './road.js';
+import { generateWater, updateWaterTime } from './water.js';
+import { getAllPoolMeshes, removeInstance } from './instancing.js';
 
 // ------------------------------------------------------------------
 // シーン基本セットアップ
@@ -44,6 +47,9 @@ scene.add(dirLight);
 // ------------------------------------------------------------------
 const terrain = createTerrain();
 scene.add(terrain);
+
+// 建物・木・道路が使うInstancedMeshプールをシーンに追加
+getAllPoolMeshes().forEach((mesh) => scene.add(mesh));
 
 // ------------------------------------------------------------------
 // キャラクター（カプセル＋球のローポリ人型）
@@ -103,12 +109,6 @@ const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 let hoveredTile = null;
 
-// 道路・水は未実装のためダミー表示（フェーズ4で置き換え予定）
-const DUMMY_COLORS = {
-  road: 0x777777,
-  water: 0x3a7ca5,
-};
-
 function updatePointerFromEvent(event) {
   const rect = renderer.domElement.getBoundingClientRect();
   pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -122,53 +122,73 @@ function getIntersectedTile(event) {
   return intersects.length > 0 ? intersects[0].object : null;
 }
 
+/**
+ * タイルに置かれているオブジェクトを解放する。
+ * 家・木・道路はInstancedMeshのインスタンスなのでプールに返却し、
+ * 水は専用メッシュなのでシーンから削除してジオメトリを破棄する
+ * （マテリアルは全水タイルで共有しているため破棄しない）。
+ */
 function clearTileObject(tile) {
-  if (!tile.userData.object) return;
-  const object = tile.userData.object;
-  scene.remove(object);
-  object.traverse((child) => {
-    if (child.geometry) child.geometry.dispose();
-    if (child.material) child.material.dispose();
-  });
+  const entry = tile.userData.object;
+  if (!entry) return;
+
+  if (entry.kind === 'instances') {
+    entry.parts.forEach((part) => removeInstance(part));
+  } else if (entry.kind === 'mesh') {
+    scene.remove(entry.object3D);
+    entry.object3D.geometry.dispose();
+  }
+
   tile.userData.object = null;
+}
+
+function getNeighborTiles(tile) {
+  const { gridX, gridY } = tile.userData;
+  return [
+    getTile(terrain, gridX, gridY - 1),
+    getTile(terrain, gridX, gridY + 1),
+    getTile(terrain, gridX - 1, gridY),
+    getTile(terrain, gridX + 1, gridY),
+  ].filter(Boolean);
+}
+
+/**
+ * 道路タイルの見た目（直線・角・T字・十字）を隣接状況から再計算する。
+ * 道路以外のタイルには何もしない。
+ */
+function refreshRoadTile(tile) {
+  if (tile.userData.tileType !== 'road') return;
+  clearTileObject(tile);
+  const connections = computeRoadConnections(terrain, tile.userData.gridX, tile.userData.gridY);
+  tile.userData.object = generateRoad(tile.position, connections);
 }
 
 /**
  * 選択された種類に応じたオブジェクトをタイル中心に配置する。
- * 家・木はプロシージャル生成（座標から決定論的なseedを算出）、
- * 道路・水はフェーズ4までダミー表示。
+ * 家・木・道路はInstancedMeshのインスタンス、水は波アニメーション付きの専用メッシュ。
+ * seedはタイル座標から決定論的に算出するため、再構築しても同じ見た目になる。
  */
 function buildOnTile(tile, type) {
   clearTileObject(tile);
-
-  if (type === 'clear') {
-    tile.userData.tileType = 'grass';
-    return;
-  }
+  tile.userData.tileType = type === 'clear' ? 'grass' : type;
 
   const seedBase = tile.userData.gridX * 1000 + tile.userData.gridY;
-  let object;
 
   if (type === 'house') {
-    object = generateBuilding(seedBase, type);
+    tile.userData.object = generateBuilding(seedBase, type, tile.position);
   } else if (type === 'tree') {
-    object = generateTree(seedBase + 500000);
-  } else {
-    const geometry = new THREE.BoxGeometry(1.4, 1.4, 1.4);
-    const material = new THREE.MeshStandardMaterial({
-      color: DUMMY_COLORS[type] ?? 0xffffff,
-      flatShading: true,
-    });
-    object = new THREE.Mesh(geometry, material);
-    object.position.y = 0.7;
+    tile.userData.object = generateTree(seedBase + 500000, undefined, tile.position);
+  } else if (type === 'water') {
+    const object3D = generateWater(tile.position, TILE_SIZE);
+    scene.add(object3D);
+    tile.userData.object = { kind: 'mesh', object3D };
+  } else if (type === 'road') {
+    const connections = computeRoadConnections(terrain, tile.userData.gridX, tile.userData.gridY);
+    tile.userData.object = generateRoad(tile.position, connections);
   }
 
-  object.position.x = tile.position.x;
-  object.position.z = tile.position.z;
-  scene.add(object);
-
-  tile.userData.object = object;
-  tile.userData.tileType = type;
+  // このタイルの変化で隣接する道路タイルの接続形状が変わるかもしれないため更新する
+  getNeighborTiles(tile).forEach(refreshRoadTile);
 }
 
 renderer.domElement.addEventListener('pointermove', (event) => {
@@ -207,8 +227,23 @@ const clock = new THREE.Clock();
 const moveDirection = new THREE.Vector3();
 const desiredCameraPosition = new THREE.Vector3();
 
+const fpsCounterEl = document.getElementById('fps-counter');
+let fpsFrameCount = 0;
+let fpsElapsed = 0;
+
 function animate() {
   const delta = Math.min(clock.getDelta(), 0.1);
+
+  updateWaterTime(clock.elapsedTime);
+
+  fpsFrameCount += 1;
+  fpsElapsed += delta;
+  if (fpsElapsed >= 0.5) {
+    const fps = Math.round(fpsFrameCount / fpsElapsed);
+    fpsCounterEl.textContent = `FPS: ${fps}`;
+    fpsFrameCount = 0;
+    fpsElapsed = 0;
+  }
 
   // 入力から移動方向（ワールド座標系）を決定
   moveDirection.set(0, 0, 0);

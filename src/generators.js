@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mulberry32 } from './random.js';
+import { registerPool, addInstance, UNIT_BOX_POOL } from './instancing.js';
 import {
   BUILDING_WALL_COLORS,
   BUILDING_ROOF_COLORS,
@@ -15,13 +16,40 @@ function pick(rng, colors) {
   return colors[Math.floor(rng() * colors.length)];
 }
 
+// 底面を原点に置いた単位ジオメトリ。すべてのインスタンスで共有し、
+// 位置・回転・非一様スケール・インスタンスカラーだけで見た目を変える。
+const unitBoxGeometry = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+const unitConeSquareGeometry = new THREE.ConeGeometry(1, 1, 4).translate(0, 0.5, 0);
+const unitConeRoundGeometry = new THREE.ConeGeometry(1, 1, 7).translate(0, 0.5, 0);
+const unitTrunkGeometry = new THREE.CylinderGeometry(0.08, 0.13, 1, 6).translate(0, 0.5, 0);
+const unitSphereGeometry = new THREE.SphereGeometry(1, 6, 5);
+
+function makeInstancedMaterial() {
+  // material.colorは白のままにして、インスタンスカラーをそのまま反映させる
+  return new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true });
+}
+
+export const UNIT_CONE_SQUARE_POOL = 'unit-cone-square';
+const UNIT_CONE_ROUND_POOL = 'unit-cone-round';
+const UNIT_TRUNK_POOL = 'unit-trunk';
+const UNIT_SPHERE_POOL = 'unit-sphere';
+
+registerPool(UNIT_BOX_POOL, unitBoxGeometry, makeInstancedMaterial());
+registerPool(UNIT_CONE_SQUARE_POOL, unitConeSquareGeometry, makeInstancedMaterial());
+registerPool(UNIT_CONE_ROUND_POOL, unitConeRoundGeometry, makeInstancedMaterial());
+registerPool(UNIT_TRUNK_POOL, unitTrunkGeometry, makeInstancedMaterial());
+registerPool(UNIT_SPHERE_POOL, unitSphereGeometry, makeInstancedMaterial());
+
+const ZERO_ROTATION = new THREE.Euler(0, 0, 0);
+
 /**
- * 立方体を1〜3段積み重ねた低ポリ建物を生成する。
+ * 立方体を1〜3段積み重ねた低ポリ建物を、InstancedMeshのインスタンスとして配置する。
  * 同じseedを渡せば常に同じ建物になる（決定論的）。
+ * @returns {{ kind: 'instances', parts: Array<{key: string, index: number}> }}
  */
-export function generateBuilding(seed, type = 'house') {
+export function generateBuilding(seed, type = 'house', tilePosition) {
   const rng = mulberry32(seed);
-  const group = new THREE.Group();
+  const parts = [];
 
   const floors = 1 + Math.floor(rng() * 3); // 1〜3段
   let currentY = 0;
@@ -29,67 +57,47 @@ export function generateBuilding(seed, type = 'house') {
 
   for (let i = 0; i < floors; i++) {
     const width = FOOTPRINT - i * 0.15;
-    const geometry = new THREE.BoxGeometry(width, FLOOR_HEIGHT, width);
-    const material = new THREE.MeshStandardMaterial({
-      color: pick(rng, BUILDING_WALL_COLORS),
-      flatShading: true,
-    });
-    const floorMesh = new THREE.Mesh(geometry, material);
-    floorMesh.position.y = currentY + FLOOR_HEIGHT / 2;
-    group.add(floorMesh);
+    const color = new THREE.Color(pick(rng, BUILDING_WALL_COLORS));
+    const position = new THREE.Vector3(tilePosition.x, currentY, tilePosition.z);
+    const scale = new THREE.Vector3(width, FLOOR_HEIGHT, width);
+    parts.push(addInstance(UNIT_BOX_POOL, position, ZERO_ROTATION, scale, color));
     currentY += FLOOR_HEIGHT;
     topWidth = width;
   }
 
-  const roofMaterial = new THREE.MeshStandardMaterial({
-    color: pick(rng, BUILDING_ROOF_COLORS),
-    flatShading: true,
-  });
+  const roofColor = new THREE.Color(pick(rng, BUILDING_ROOF_COLORS));
+  const roofPosition = new THREE.Vector3(tilePosition.x, currentY, tilePosition.z);
 
   if (rng() < 0.5) {
     // 三角屋根
     const roofHeight = 0.8;
-    const roofGeometry = new THREE.ConeGeometry(topWidth * 0.75, roofHeight, 4);
-    const roof = new THREE.Mesh(roofGeometry, roofMaterial);
-    roof.rotation.y = Math.PI / 4;
-    roof.position.y = currentY + roofHeight / 2;
-    group.add(roof);
+    const rotation = new THREE.Euler(0, Math.PI / 4, 0);
+    const scale = new THREE.Vector3(topWidth * 0.75, roofHeight, topWidth * 0.75);
+    parts.push(addInstance(UNIT_CONE_SQUARE_POOL, roofPosition, rotation, scale, roofColor));
   } else {
     // 平屋根
-    const roofGeometry = new THREE.BoxGeometry(
-      topWidth * 1.05,
-      0.15,
-      topWidth * 1.05
-    );
-    const roof = new THREE.Mesh(roofGeometry, roofMaterial);
-    roof.position.y = currentY + 0.075;
-    group.add(roof);
+    const scale = new THREE.Vector3(topWidth * 1.05, 0.15, topWidth * 1.05);
+    parts.push(addInstance(UNIT_BOX_POOL, roofPosition, ZERO_ROTATION, scale, roofColor));
   }
 
-  group.userData.generatorType = 'building';
-  group.userData.buildingType = type;
-  group.userData.seed = seed;
-  return group;
+  return { kind: 'instances', parts };
 }
 
 /**
- * 針葉樹（円柱＋円錐2〜3段）または広葉樹（円柱＋球3〜4個）を生成する。
+ * 針葉樹（円柱＋円錐2〜3段）または広葉樹（円柱＋球3〜4個）をInstancedMeshで配置する。
  * typeを省略するとseedに基づき決定論的にどちらかが選ばれる。
+ * @returns {{ kind: 'instances', parts: Array<{key: string, index: number}> }}
  */
-export function generateTree(seed, type) {
+export function generateTree(seed, type, tilePosition) {
   const rng = mulberry32(seed);
   const resolvedType = type ?? (rng() < 0.5 ? 'conifer' : 'broadleaf');
-  const group = new THREE.Group();
+  const parts = [];
 
   const trunkHeight = 0.6 + rng() * 0.3;
-  const trunkGeometry = new THREE.CylinderGeometry(0.08, 0.13, trunkHeight, 6);
-  const trunkMaterial = new THREE.MeshStandardMaterial({
-    color: TRUNK_COLOR,
-    flatShading: true,
-  });
-  const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-  trunk.position.y = trunkHeight / 2;
-  group.add(trunk);
+  const trunkColor = new THREE.Color(TRUNK_COLOR);
+  const trunkPosition = new THREE.Vector3(tilePosition.x, 0, tilePosition.z);
+  const trunkScale = new THREE.Vector3(1, trunkHeight, 1);
+  parts.push(addInstance(UNIT_TRUNK_POOL, trunkPosition, ZERO_ROTATION, trunkScale, trunkColor));
 
   if (resolvedType === 'conifer') {
     const tiers = 2 + Math.floor(rng() * 2); // 2〜3段
@@ -98,14 +106,11 @@ export function generateTree(seed, type) {
 
     for (let i = 0; i < tiers; i++) {
       const coneHeight = 0.7 - i * 0.1;
-      const geometry = new THREE.ConeGeometry(Math.max(radius, 0.15), coneHeight, 7);
-      const material = new THREE.MeshStandardMaterial({
-        color: pick(rng, TREE_CONIFER_COLORS),
-        flatShading: true,
-      });
-      const cone = new THREE.Mesh(geometry, material);
-      cone.position.y = baseY + coneHeight / 2;
-      group.add(cone);
+      const clampedRadius = Math.max(radius, 0.15);
+      const color = new THREE.Color(pick(rng, TREE_CONIFER_COLORS));
+      const position = new THREE.Vector3(tilePosition.x, baseY, tilePosition.z);
+      const scale = new THREE.Vector3(clampedRadius, coneHeight, clampedRadius);
+      parts.push(addInstance(UNIT_CONE_ROUND_POOL, position, ZERO_ROTATION, scale, color));
       baseY += coneHeight * 0.55;
       radius -= 0.13;
     }
@@ -114,22 +119,19 @@ export function generateTree(seed, type) {
 
     for (let i = 0; i < blobCount; i++) {
       const radius = 0.35 + rng() * 0.15;
-      const geometry = new THREE.SphereGeometry(radius, 6, 5);
-      const material = new THREE.MeshStandardMaterial({
-        color: pick(rng, TREE_BROADLEAF_COLORS),
-        flatShading: true,
-      });
-      const blob = new THREE.Mesh(geometry, material);
+      const color = new THREE.Color(pick(rng, TREE_BROADLEAF_COLORS));
       const offsetX = (rng() - 0.5) * 0.5;
       const offsetZ = (rng() - 0.5) * 0.5;
       const offsetY = rng() * 0.4;
-      blob.position.set(offsetX, trunkHeight + 0.2 + offsetY, offsetZ);
-      group.add(blob);
+      const position = new THREE.Vector3(
+        tilePosition.x + offsetX,
+        trunkHeight + 0.2 + offsetY,
+        tilePosition.z + offsetZ
+      );
+      const scale = new THREE.Vector3(radius, radius, radius);
+      parts.push(addInstance(UNIT_SPHERE_POOL, position, ZERO_ROTATION, scale, color));
     }
   }
 
-  group.userData.generatorType = 'tree';
-  group.userData.treeType = resolvedType;
-  group.userData.seed = seed;
-  return group;
+  return { kind: 'instances', parts };
 }

@@ -39,3 +39,13 @@ export function createTerrain() {
 export function setTileHighlighted(tile, highlighted) {
   tile.material.color.set(highlighted ? HOVER_COLOR : BASE_COLOR);
 }
+
+/**
+ * グリッド座標からタイルメッシュを取得する。範囲外はnullを返す。
+ */
+export function getTile(terrainGroup, gridX, gridY) {
+  if (gridX < 0 || gridY < 0 || gridX >= GRID_SIZE || gridY >= GRID_SIZE) {
+    return null;
+  }
+  return terrainGroup.children[gridY * GRID_SIZE + gridX];
+}
