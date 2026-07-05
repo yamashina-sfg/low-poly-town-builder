@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { createTerrain, setTileHighlighted, GROUND_SIZE } from './terrain.js';
+import { showBuildMenu, hideBuildMenu } from './buildMenu.js';
+import { generateBuilding, generateTree } from './generators.js';
 
 // ------------------------------------------------------------------
 // シーン基本セットアップ
@@ -37,17 +40,10 @@ dirLight.position.set(10, 20, 10);
 scene.add(dirLight);
 
 // ------------------------------------------------------------------
-// 地面（20x20、flat shadingの緑）
+// 地面（10x10のタイルグリッド、flat shadingの緑）
 // ------------------------------------------------------------------
-const GROUND_SIZE = 20;
-const groundGeometry = new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE, 1, 1);
-groundGeometry.rotateX(-Math.PI / 2);
-const groundMaterial = new THREE.MeshStandardMaterial({
-  color: 0x6fae5c,
-  flatShading: true,
-});
-const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-scene.add(ground);
+const terrain = createTerrain();
+scene.add(terrain);
 
 // ------------------------------------------------------------------
 // キャラクター（カプセル＋球のローポリ人型）
@@ -99,6 +95,106 @@ const cameraCurrentPosition = new THREE.Vector3()
   .copy(character.position)
   .add(CAMERA_OFFSET);
 camera.position.copy(cameraCurrentPosition);
+
+// ------------------------------------------------------------------
+// 建築システム（レイキャストでタイル選択 → ホバー表示 → クリックで建築メニュー）
+// ------------------------------------------------------------------
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let hoveredTile = null;
+
+// 道路・水は未実装のためダミー表示（フェーズ4で置き換え予定）
+const DUMMY_COLORS = {
+  road: 0x777777,
+  water: 0x3a7ca5,
+};
+
+function updatePointerFromEvent(event) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+}
+
+function getIntersectedTile(event) {
+  updatePointerFromEvent(event);
+  raycaster.setFromCamera(pointer, camera);
+  const intersects = raycaster.intersectObjects(terrain.children, false);
+  return intersects.length > 0 ? intersects[0].object : null;
+}
+
+function clearTileObject(tile) {
+  if (!tile.userData.object) return;
+  const object = tile.userData.object;
+  scene.remove(object);
+  object.traverse((child) => {
+    if (child.geometry) child.geometry.dispose();
+    if (child.material) child.material.dispose();
+  });
+  tile.userData.object = null;
+}
+
+/**
+ * 選択された種類に応じたオブジェクトをタイル中心に配置する。
+ * 家・木はプロシージャル生成（座標から決定論的なseedを算出）、
+ * 道路・水はフェーズ4までダミー表示。
+ */
+function buildOnTile(tile, type) {
+  clearTileObject(tile);
+
+  if (type === 'clear') {
+    tile.userData.tileType = 'grass';
+    return;
+  }
+
+  const seedBase = tile.userData.gridX * 1000 + tile.userData.gridY;
+  let object;
+
+  if (type === 'house') {
+    object = generateBuilding(seedBase, type);
+  } else if (type === 'tree') {
+    object = generateTree(seedBase + 500000);
+  } else {
+    const geometry = new THREE.BoxGeometry(1.4, 1.4, 1.4);
+    const material = new THREE.MeshStandardMaterial({
+      color: DUMMY_COLORS[type] ?? 0xffffff,
+      flatShading: true,
+    });
+    object = new THREE.Mesh(geometry, material);
+    object.position.y = 0.7;
+  }
+
+  object.position.x = tile.position.x;
+  object.position.z = tile.position.z;
+  scene.add(object);
+
+  tile.userData.object = object;
+  tile.userData.tileType = type;
+}
+
+renderer.domElement.addEventListener('pointermove', (event) => {
+  const tile = getIntersectedTile(event);
+  if (tile !== hoveredTile) {
+    if (hoveredTile) setTileHighlighted(hoveredTile, false);
+    hoveredTile = tile;
+    if (hoveredTile) setTileHighlighted(hoveredTile, true);
+  }
+});
+
+renderer.domElement.addEventListener('pointerleave', () => {
+  if (hoveredTile) setTileHighlighted(hoveredTile, false);
+  hoveredTile = null;
+});
+
+renderer.domElement.addEventListener('click', (event) => {
+  const tile = getIntersectedTile(event);
+  if (!tile) {
+    hideBuildMenu();
+    return;
+  }
+  showBuildMenu(event.clientX, event.clientY, (type) => {
+    buildOnTile(tile, type);
+  });
+});
 
 // ------------------------------------------------------------------
 // メインループ
