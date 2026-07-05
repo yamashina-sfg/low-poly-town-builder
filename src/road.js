@@ -30,12 +30,14 @@ export function computeRoadConnections(terrainGroup, gridX, gridY) {
  * 道路タイルを生成する。グレーの土台＋接続方向に伸びる白い破線で構成される。
  * @returns {{ kind: 'instances', parts: Array<{key: string, index: number}> }}
  */
-export function generateRoad(tilePosition, connections) {
+export function generateRoad(tilePosition, connections, { animate = false } = {}) {
   const parts = [];
 
   const basePosition = new THREE.Vector3(tilePosition.x, 0.02, tilePosition.z);
   const baseScale = new THREE.Vector3(TILE_SIZE, 0.02, TILE_SIZE);
-  parts.push(addInstance(UNIT_BOX_POOL, basePosition, ZERO_ROTATION, baseScale, ROAD_BASE_COLOR));
+  parts.push(
+    addInstance(UNIT_BOX_POOL, basePosition, ZERO_ROTATION, baseScale, ROAD_BASE_COLOR, { animate })
+  );
 
   DIRECTIONS.forEach(({ key, dx, dz }) => {
     if (!connections[key]) return;
@@ -53,7 +55,7 @@ export function generateRoad(tilePosition, connections) {
         0.04,
         tilePosition.z + dz * TILE_SIZE * t
       );
-      parts.push(addInstance(UNIT_BOX_POOL, position, ZERO_ROTATION, scale, ROAD_LINE_COLOR));
+      parts.push(addInstance(UNIT_BOX_POOL, position, ZERO_ROTATION, scale, ROAD_LINE_COLOR, { animate }));
     }
   });
 

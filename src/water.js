@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import { easeOutBack } from './easing.js';
+
+const GROW_DURATION = 0.35; // 秒
+const growingMeshes = [];
 
 // 全ての水タイルで共有するシェーダーマテリアル。time uniformを毎フレーム
 // 更新するだけで、頂点シェーダー内のsin波によって揺れて見える。
@@ -32,15 +36,32 @@ const waterMaterial = new THREE.ShaderMaterial({
 /**
  * 半透明で波打つ水タイルのメッシュを生成する。
  * マテリアルは全水タイルで共有し、ジオメトリのみタイルごとに個別。
+ * animate: trueの場合、タイルに広がるようにポップインする。
  */
-export function generateWater(tilePosition, tileSize) {
+export function generateWater(tilePosition, tileSize, { animate = true } = {}) {
   const geometry = new THREE.PlaneGeometry(tileSize * 0.98, tileSize * 0.98, 6, 6);
   geometry.rotateX(-Math.PI / 2);
   const mesh = new THREE.Mesh(geometry, waterMaterial);
   mesh.position.set(tilePosition.x, 0.06, tilePosition.z);
+
+  if (animate) {
+    mesh.scale.set(0.001, 1, 0.001);
+    growingMeshes.push({ mesh, startTime: null });
+  }
+
   return mesh;
 }
 
 export function updateWaterTime(elapsedSeconds) {
   waterUniforms.time.value = elapsedSeconds;
+
+  for (let i = growingMeshes.length - 1; i >= 0; i -= 1) {
+    const anim = growingMeshes[i];
+    if (anim.startTime === null) anim.startTime = elapsedSeconds;
+    const t = Math.min(1, (elapsedSeconds - anim.startTime) / GROW_DURATION);
+    const eased = Math.max(0.001, easeOutBack(t));
+    anim.mesh.scale.x = eased;
+    anim.mesh.scale.z = eased;
+    if (t >= 1) growingMeshes.splice(i, 1);
+  }
 }

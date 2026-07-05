@@ -56,6 +56,30 @@ canvas {
   color: #223322;
 }
 
+.debug-character {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.debug-character label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.debug-character input[type='color'] {
+  width: 36px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+
 .debug-buttons {
   display: flex;
   gap: 6px;

@@ -47,7 +47,7 @@ const ZERO_ROTATION = new THREE.Euler(0, 0, 0);
  * 同じseedを渡せば常に同じ建物になる（決定論的）。
  * @returns {{ kind: 'instances', parts: Array<{key: string, index: number}> }}
  */
-export function generateBuilding(seed, type = 'house', tilePosition) {
+export function generateBuilding(seed, type = 'house', tilePosition, { animate = true } = {}) {
   const rng = mulberry32(seed);
   const parts = [];
 
@@ -60,7 +60,7 @@ export function generateBuilding(seed, type = 'house', tilePosition) {
     const color = new THREE.Color(pick(rng, BUILDING_WALL_COLORS));
     const position = new THREE.Vector3(tilePosition.x, currentY, tilePosition.z);
     const scale = new THREE.Vector3(width, FLOOR_HEIGHT, width);
-    parts.push(addInstance(UNIT_BOX_POOL, position, ZERO_ROTATION, scale, color));
+    parts.push(addInstance(UNIT_BOX_POOL, position, ZERO_ROTATION, scale, color, { animate }));
     currentY += FLOOR_HEIGHT;
     topWidth = width;
   }
@@ -73,11 +73,11 @@ export function generateBuilding(seed, type = 'house', tilePosition) {
     const roofHeight = 0.8;
     const rotation = new THREE.Euler(0, Math.PI / 4, 0);
     const scale = new THREE.Vector3(topWidth * 0.75, roofHeight, topWidth * 0.75);
-    parts.push(addInstance(UNIT_CONE_SQUARE_POOL, roofPosition, rotation, scale, roofColor));
+    parts.push(addInstance(UNIT_CONE_SQUARE_POOL, roofPosition, rotation, scale, roofColor, { animate }));
   } else {
     // 平屋根
     const scale = new THREE.Vector3(topWidth * 1.05, 0.15, topWidth * 1.05);
-    parts.push(addInstance(UNIT_BOX_POOL, roofPosition, ZERO_ROTATION, scale, roofColor));
+    parts.push(addInstance(UNIT_BOX_POOL, roofPosition, ZERO_ROTATION, scale, roofColor, { animate }));
   }
 
   return { kind: 'instances', parts };
@@ -88,7 +88,7 @@ export function generateBuilding(seed, type = 'house', tilePosition) {
  * typeを省略するとseedに基づき決定論的にどちらかが選ばれる。
  * @returns {{ kind: 'instances', parts: Array<{key: string, index: number}> }}
  */
-export function generateTree(seed, type, tilePosition) {
+export function generateTree(seed, type, tilePosition, { animate = true } = {}) {
   const rng = mulberry32(seed);
   const resolvedType = type ?? (rng() < 0.5 ? 'conifer' : 'broadleaf');
   const parts = [];
@@ -97,7 +97,9 @@ export function generateTree(seed, type, tilePosition) {
   const trunkColor = new THREE.Color(TRUNK_COLOR);
   const trunkPosition = new THREE.Vector3(tilePosition.x, 0, tilePosition.z);
   const trunkScale = new THREE.Vector3(1, trunkHeight, 1);
-  parts.push(addInstance(UNIT_TRUNK_POOL, trunkPosition, ZERO_ROTATION, trunkScale, trunkColor));
+  parts.push(
+    addInstance(UNIT_TRUNK_POOL, trunkPosition, ZERO_ROTATION, trunkScale, trunkColor, { animate })
+  );
 
   if (resolvedType === 'conifer') {
     const tiers = 2 + Math.floor(rng() * 2); // 2〜3段
@@ -110,7 +112,7 @@ export function generateTree(seed, type, tilePosition) {
       const color = new THREE.Color(pick(rng, TREE_CONIFER_COLORS));
       const position = new THREE.Vector3(tilePosition.x, baseY, tilePosition.z);
       const scale = new THREE.Vector3(clampedRadius, coneHeight, clampedRadius);
-      parts.push(addInstance(UNIT_CONE_ROUND_POOL, position, ZERO_ROTATION, scale, color));
+      parts.push(addInstance(UNIT_CONE_ROUND_POOL, position, ZERO_ROTATION, scale, color, { animate }));
       baseY += coneHeight * 0.55;
       radius -= 0.13;
     }
@@ -129,7 +131,7 @@ export function generateTree(seed, type, tilePosition) {
         tilePosition.z + offsetZ
       );
       const scale = new THREE.Vector3(radius, radius, radius);
-      parts.push(addInstance(UNIT_SPHERE_POOL, position, ZERO_ROTATION, scale, color));
+      parts.push(addInstance(UNIT_SPHERE_POOL, position, ZERO_ROTATION, scale, color, { animate }));
     }
   }
 

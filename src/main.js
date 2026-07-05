@@ -4,9 +4,12 @@ import { showBuildMenu, hideBuildMenu } from './buildMenu.js';
 import { generateBuilding, generateTree } from './generators.js';
 import { generateRoad, computeRoadConnections } from './road.js';
 import { generateWater, updateWaterTime } from './water.js';
-import { getAllPoolMeshes, removeInstance, getInstanceCount } from './instancing.js';
-import { initDebugPanel, updateDebugStats, setSeedInputValue } from './debugPanel.js';
+import { getAllPoolMeshes, removeInstance, getInstanceCount, updateInstanceAnimations } from './instancing.js';
+import { initDebugPanel, updateDebugStats, setSeedInputValue, setMuteButtonLabel } from './debugPanel.js';
 import { saveTownToLocalStorage, loadTownFromLocalStorage } from './save.js';
+import { createCharacter } from './character.js';
+import { updateDayNightCycle } from './dayNightCycle.js';
+import { startAmbientAudio, setAmbientMuted } from './ambientAudio.js';
 
 // ------------------------------------------------------------------
 // シーン基本セットアップ
@@ -54,28 +57,10 @@ scene.add(terrain);
 getAllPoolMeshes().forEach((mesh) => scene.add(mesh));
 
 // ------------------------------------------------------------------
-// キャラクター（カプセル＋球のローポリ人型）
+// キャラクター（腕・脚のあるローポリ人型。服・帽子の色は変更可能）
 // ------------------------------------------------------------------
-const character = new THREE.Group();
-
-const bodyGeometry = new THREE.CapsuleGeometry(0.4, 0.8, 4, 8);
-const bodyMaterial = new THREE.MeshStandardMaterial({
-  color: 0x3b6ea5,
-  flatShading: true,
-});
-const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-body.position.y = 0.9;
-character.add(body);
-
-const headGeometry = new THREE.SphereGeometry(0.32, 8, 6);
-const headMaterial = new THREE.MeshStandardMaterial({
-  color: 0xe8b98d,
-  flatShading: true,
-});
-const head = new THREE.Mesh(headGeometry, headMaterial);
-head.position.y = 1.65;
-character.add(head);
-
+const characterController = createCharacter({ clothingColor: 0x3b6ea5, hatColor: 0xb5533c });
+const character = characterController.group;
 character.position.set(0, 0, 0);
 scene.add(character);
 
@@ -194,7 +179,7 @@ function buildOnTile(tile, type) {
     tile.userData.object = { kind: 'mesh', object3D };
   } else if (type === 'road') {
     const connections = computeRoadConnections(terrain, tile.userData.gridX, tile.userData.gridY);
-    tile.userData.object = generateRoad(tile.position, connections);
+    tile.userData.object = generateRoad(tile.position, connections, { animate: true });
   }
 
   // このタイルの変化で隣接する道路タイルの接続形状が変わるかもしれないため更新する
@@ -250,12 +235,32 @@ function handleSeedChange(newSeed) {
   regenerateProceduralTiles();
 }
 
+let ambientMuted = false;
+
+function handleToggleMute() {
+  ambientMuted = !ambientMuted;
+  setAmbientMuted(ambientMuted);
+  setMuteButtonLabel(ambientMuted);
+}
+
 initDebugPanel({
   onSave: handleSave,
   onLoad: handleLoad,
   onReset: resetTown,
   onSeedChange: handleSeedChange,
+  onToggleMute: handleToggleMute,
+  onClothingColorChange: (hex) => characterController.setClothingColor(hex),
+  onHatColorChange: (hex) => characterController.setHatColor(hex),
 });
+
+// ブラウザの自動再生ポリシーのため、最初のキー入力/クリックで環境音を開始する
+function beginAudioOnFirstInteraction() {
+  startAmbientAudio();
+  window.removeEventListener('keydown', beginAudioOnFirstInteraction);
+  window.removeEventListener('click', beginAudioOnFirstInteraction);
+}
+window.addEventListener('keydown', beginAudioOnFirstInteraction, { once: true });
+window.addEventListener('click', beginAudioOnFirstInteraction, { once: true });
 
 renderer.domElement.addEventListener('pointermove', (event) => {
   const tile = getIntersectedTile(event);
@@ -300,6 +305,8 @@ function animate() {
   const delta = Math.min(clock.getDelta(), 0.1);
 
   updateWaterTime(clock.elapsedTime);
+  updateInstanceAnimations(clock.elapsedTime);
+  updateDayNightCycle({ elapsed: clock.elapsedTime, scene, dirLight, hemiLight });
 
   fpsFrameCount += 1;
   fpsElapsed += delta;
@@ -324,7 +331,8 @@ function animate() {
   if (isPressed('KeyA', 'ArrowLeft')) moveDirection.x -= 1;
   if (isPressed('KeyD', 'ArrowRight')) moveDirection.x += 1;
 
-  if (moveDirection.lengthSq() > 0) {
+  const isMoving = moveDirection.lengthSq() > 0;
+  if (isMoving) {
     moveDirection.normalize();
 
     character.position.addScaledVector(moveDirection, MOVE_SPEED * delta);
@@ -336,6 +344,7 @@ function animate() {
     characterFacing += angleDiff * Math.min(1, TURN_SMOOTHING * delta);
     character.rotation.y = characterFacing;
   }
+  characterController.updateWalkAnimation(isMoving, delta);
 
   // 地面の範囲内にキャラを収める
   const half = GROUND_SIZE / 2 - 0.5;
