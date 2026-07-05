@@ -8,7 +8,24 @@
   </head>
   <body>
     <div id="app"></div>
-    <div id="fps-counter" class="fps-counter">FPS: --</div>
+    <div id="debug-panel" class="debug-panel">
+      <div class="debug-stats">
+        <div>タイル数: <span id="stat-tiles">0</span></div>
+        <div>建物数: <span id="stat-buildings">0</span></div>
+        <div>木の数: <span id="stat-trees">0</span></div>
+        <div>FPS: <span id="stat-fps">--</span></div>
+        <div>インスタンス数: <span id="stat-instances">0</span></div>
+      </div>
+      <label class="debug-seed">
+        シード
+        <input type="number" id="seed-input" value="1" />
+      </label>
+      <div class="debug-buttons">
+        <button type="button" id="save-button">保存</button>
+        <button type="button" id="load-button">読込</button>
+        <button type="button" id="reset-button">リセット</button>
+      </div>
+    </div>
     <div id="build-menu" class="build-menu hidden">
       <button type="button" data-type="house">家</button>
       <button type="button" data-type="tree">木</button>

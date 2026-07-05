@@ -4,7 +4,9 @@ import { showBuildMenu, hideBuildMenu } from './buildMenu.js';
 import { generateBuilding, generateTree } from './generators.js';
 import { generateRoad, computeRoadConnections } from './road.js';
 import { generateWater, updateWaterTime } from './water.js';
-import { getAllPoolMeshes, removeInstance } from './instancing.js';
+import { getAllPoolMeshes, removeInstance, getInstanceCount } from './instancing.js';
+import { initDebugPanel, updateDebugStats, setSeedInputValue } from './debugPanel.js';
+import { saveTownToLocalStorage, loadTownFromLocalStorage } from './save.js';
 
 // ------------------------------------------------------------------
 // シーン基本セットアップ
@@ -109,6 +111,14 @@ const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 let hoveredTile = null;
 
+// ワールドシード：建物・木の配色パターンをタイル座標と組み合わせて決定論的に決める。
+// 同じ座標でもシードを変えれば見た目が一括で変わり、同じシードなら常に同じ町になる。
+let worldSeed = 1;
+
+function computeSeed(gridX, gridY, salt = 0) {
+  return (worldSeed * 7919 + gridX * 1000 + gridY + salt) >>> 0;
+}
+
 function updatePointerFromEvent(event) {
   const rect = renderer.domElement.getBoundingClientRect();
   pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -172,12 +182,12 @@ function buildOnTile(tile, type) {
   clearTileObject(tile);
   tile.userData.tileType = type === 'clear' ? 'grass' : type;
 
-  const seedBase = tile.userData.gridX * 1000 + tile.userData.gridY;
-
   if (type === 'house') {
-    tile.userData.object = generateBuilding(seedBase, type, tile.position);
+    const seed = computeSeed(tile.userData.gridX, tile.userData.gridY);
+    tile.userData.object = generateBuilding(seed, type, tile.position);
   } else if (type === 'tree') {
-    tile.userData.object = generateTree(seedBase + 500000, undefined, tile.position);
+    const seed = computeSeed(tile.userData.gridX, tile.userData.gridY, 500000);
+    tile.userData.object = generateTree(seed, undefined, tile.position);
   } else if (type === 'water') {
     const object3D = generateWater(tile.position, TILE_SIZE);
     scene.add(object3D);
@@ -190,6 +200,62 @@ function buildOnTile(tile, type) {
   // このタイルの変化で隣接する道路タイルの接続形状が変わるかもしれないため更新する
   getNeighborTiles(tile).forEach(refreshRoadTile);
 }
+
+function getTownStats() {
+  let buildingCount = 0;
+  let treeCount = 0;
+  terrain.children.forEach((tile) => {
+    if (tile.userData.tileType === 'house') buildingCount += 1;
+    if (tile.userData.tileType === 'tree') treeCount += 1;
+  });
+  return { tileCount: terrain.children.length, buildingCount, treeCount };
+}
+
+function resetTown() {
+  terrain.children.forEach((tile) => {
+    if (tile.userData.tileType !== 'grass') buildOnTile(tile, 'clear');
+  });
+}
+
+/**
+ * 現在配置されている家・木だけを、現在のワールドシードで作り直す。
+ * シード値入力欄が変更されたときに呼ばれる。
+ */
+function regenerateProceduralTiles() {
+  terrain.children.forEach((tile) => {
+    const { tileType } = tile.userData;
+    if (tileType === 'house' || tileType === 'tree') buildOnTile(tile, tileType);
+  });
+}
+
+function handleSave() {
+  saveTownToLocalStorage(terrain, worldSeed);
+}
+
+function handleLoad() {
+  const data = loadTownFromLocalStorage();
+  if (!data) return;
+
+  resetTown();
+  worldSeed = Number.isFinite(data.seed) ? data.seed : 1;
+  setSeedInputValue(worldSeed);
+  data.cells.forEach((cell) => {
+    const tile = getTile(terrain, cell.x, cell.y);
+    if (tile) buildOnTile(tile, cell.type);
+  });
+}
+
+function handleSeedChange(newSeed) {
+  worldSeed = newSeed;
+  regenerateProceduralTiles();
+}
+
+initDebugPanel({
+  onSave: handleSave,
+  onLoad: handleLoad,
+  onReset: resetTown,
+  onSeedChange: handleSeedChange,
+});
 
 renderer.domElement.addEventListener('pointermove', (event) => {
   const tile = getIntersectedTile(event);
@@ -227,7 +293,6 @@ const clock = new THREE.Clock();
 const moveDirection = new THREE.Vector3();
 const desiredCameraPosition = new THREE.Vector3();
 
-const fpsCounterEl = document.getElementById('fps-counter');
 let fpsFrameCount = 0;
 let fpsElapsed = 0;
 
@@ -240,7 +305,14 @@ function animate() {
   fpsElapsed += delta;
   if (fpsElapsed >= 0.5) {
     const fps = Math.round(fpsFrameCount / fpsElapsed);
-    fpsCounterEl.textContent = `FPS: ${fps}`;
+    const stats = getTownStats();
+    updateDebugStats({
+      tileCount: stats.tileCount,
+      buildingCount: stats.buildingCount,
+      treeCount: stats.treeCount,
+      fps,
+      instanceCount: getInstanceCount(),
+    });
     fpsFrameCount = 0;
     fpsElapsed = 0;
   }
