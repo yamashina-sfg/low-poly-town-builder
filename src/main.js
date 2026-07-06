@@ -32,7 +32,17 @@ import {
 } from './debugPanel.js';
 import { advanceGameTime, getGameTime, formatGameTime, skipTimeToMorning } from './gameTime.js';
 import { advanceSleepiness, resetSleepiness, getSleepiness } from './playerStatus.js';
-import { getWood, getMoney, canAfford, pay, addWood, trySpendMoney, trySpendWood, addMoney } from './economy.js';
+import {
+  getWood,
+  getMoney,
+  canAfford,
+  pay,
+  addWood,
+  trySpendMoney,
+  trySpendWood,
+  addMoney,
+  setResources,
+} from './economy.js';
 import { saveTownToLocalStorage, loadTownFromLocalStorage } from './save.js';
 import { createCharacter } from './character.js';
 import { createNPC } from './npc.js';
@@ -573,21 +583,36 @@ function regenerateProceduralTiles() {
 }
 
 function handleSave() {
-  saveTownToLocalStorage(forEachLoadedTile, worldSeed);
+  saveTownToLocalStorage(forEachLoadedTile, worldSeed, { wood: getWood(), money: getMoney() });
+  showStatusMessage('セーブしました');
 }
 
 function handleLoad() {
   const data = loadTownFromLocalStorage();
-  if (!data) return;
+  if (!data) {
+    showStatusMessage('セーブデータが見つからない');
+    return;
+  }
 
   resetTown();
   worldSeed = Number.isFinite(data.seed) ? data.seed : 1;
   setSeedInputValue(worldSeed);
+
+  if (data.economy) {
+    setResources(data.economy);
+    updateResourcePanel();
+  }
+
   data.cells.forEach((cell) => {
     ensureChunkForGlobalTile(cell.x, cell.y, { scene, worldSeed, onProceduralTile: handleProceduralTile });
     const tile = getGlobalTile(cell.x, cell.y);
-    if (tile) buildOnTile(tile, cell.type, { animate: false });
+    if (!tile) return;
+    buildOnTile(tile, cell.type, { animate: false });
+    if (cell.type === 'house' && Array.isArray(cell.furniture)) {
+      tile.userData.indoorFurniture = cell.furniture.slice();
+    }
   });
+  showStatusMessage('読み込みました');
 }
 
 function handleSeedChange(newSeed) {

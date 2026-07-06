@@ -27,6 +27,14 @@ export function getMoney() {
 }
 
 /**
+ * セーブデータからの復元用。不正な値は無視して現状を維持する。
+ */
+export function setResources({ wood: nextWood, money: nextMoney } = {}) {
+  if (Number.isFinite(nextWood)) wood = Math.max(0, nextWood);
+  if (Number.isFinite(nextMoney)) money = Math.max(0, nextMoney);
+}
+
+/**
  * その種類を建てるのに必要なコストを払えるか（コスト未設定の種類は常に無料）。
  */
 export function canAfford(type) {
