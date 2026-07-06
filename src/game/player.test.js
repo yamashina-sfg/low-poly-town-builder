@@ -1,0 +1,148 @@
+import { describe, test, expect, beforeEach } from 'vitest';
+import * as THREE from 'three';
+import {
+  initPlayer,
+  getCharacterPosition,
+  getCharacterFacing,
+  setCharacterFacing,
+  updateMovementInput,
+} from './player.js';
+
+function press(code) {
+  window.dispatchEvent(new KeyboardEvent('keydown', { code }));
+}
+function release(code) {
+  window.dispatchEvent(new KeyboardEvent('keyup', { code }));
+}
+
+function setup() {
+  const fakeScene = { add: () => {} };
+  const fakeCamera = { position: new THREE.Vector3(), lookAt: () => {} };
+  initPlayer(fakeScene, fakeCamera);
+}
+
+describe('その場旋回方式のA/D操作（方向転換の改善）', () => {
+  beforeEach(() => {
+    setup();
+    setCharacterFacing(0);
+    // 前のテストで押しっぱなしになっていたキーが残らないようにリセットする
+    ['KeyA', 'KeyD', 'KeyW', 'KeyS'].forEach(release);
+  });
+
+  test('Dキーは現在の向きに関係なく常に同じ角速度でその場旋回する', () => {
+    setCharacterFacing(0.4);
+    press('KeyD');
+    updateMovementInput(0.1);
+    const deltaFromZero = getCharacterFacing() - 0.4;
+    release('KeyD');
+
+    setCharacterFacing(2.5); // 全く違う向きから始めても
+    press('KeyD');
+    updateMovementInput(0.1);
+    const deltaFromOther = getCharacterFacing() - 2.5;
+    release('KeyD');
+
+    expect(deltaFromZero).toBeGreaterThan(0); // Dは正の方向へ回転する
+    expect(deltaFromOther).toBeCloseTo(deltaFromZero, 5); // 開始角度に依存しない
+  });
+
+  test('Aキーは逆方向（負）に、同じ大きさで回転する', () => {
+    press('KeyA');
+    updateMovementInput(0.1);
+    const afterA = getCharacterFacing();
+    release('KeyA');
+
+    setCharacterFacing(0);
+    press('KeyD');
+    updateMovementInput(0.1);
+    const afterD = getCharacterFacing();
+    release('KeyD');
+
+    expect(afterA).toBeLessThan(0);
+    expect(afterA).toBeCloseTo(-afterD, 5);
+  });
+
+  test('回転量はdeltaに比例する（フレームレートに依存しない）', () => {
+    setCharacterFacing(0);
+    press('KeyD');
+    updateMovementInput(0.05);
+    const small = getCharacterFacing();
+
+    setCharacterFacing(0);
+    updateMovementInput(0.1);
+    const large = getCharacterFacing();
+
+    expect(large).toBeCloseTo(small * 2, 5);
+  });
+
+  test('A/Dだけ押している間はキャラは移動しない（回転のみ）', () => {
+    const before = getCharacterPosition().clone();
+    press('KeyD');
+    const isMoving = updateMovementInput(0.1);
+    release('KeyD');
+
+    expect(isMoving).toBe(false);
+    expect(getCharacterPosition().distanceTo(before)).toBeCloseTo(0, 5);
+  });
+});
+
+describe('W/Sは現在向いている方向への前進/後退', () => {
+  beforeEach(() => {
+    setup();
+    ['KeyA', 'KeyD', 'KeyW', 'KeyS'].forEach(release);
+  });
+
+  test('facingが異なれば、Wで進む方向も追従して変わる', () => {
+    setCharacterFacing(0);
+    const start1 = getCharacterPosition().clone();
+    press('KeyW');
+    updateMovementInput(0.1);
+    release('KeyW');
+    const displacement0 = getCharacterPosition().clone().sub(start1);
+
+    setCharacterFacing(Math.PI); // 反対向き
+    const start2 = getCharacterPosition().clone();
+    press('KeyW');
+    updateMovementInput(0.1);
+    release('KeyW');
+    const displacementPi = getCharacterPosition().clone().sub(start2);
+
+    // facing=0の前進はfacing=πの前進と正反対の方向になるはず
+    expect(displacementPi.z).toBeCloseTo(-displacement0.z, 5);
+  });
+
+  test('Sキーは前進(W)と正反対の方向へ後退する', () => {
+    setCharacterFacing(0.7);
+    const start = getCharacterPosition().clone();
+    press('KeyS');
+    updateMovementInput(0.1);
+    release('KeyS');
+    const backDisplacement = getCharacterPosition().clone().sub(start);
+
+    setCharacterFacing(0.7);
+    const start2 = getCharacterPosition().clone();
+    press('KeyW');
+    updateMovementInput(0.1);
+    release('KeyW');
+    const forwardDisplacement = getCharacterPosition().clone().sub(start2);
+
+    expect(backDisplacement.x).toBeCloseTo(-forwardDisplacement.x, 5);
+    expect(backDisplacement.z).toBeCloseTo(-forwardDisplacement.z, 5);
+  });
+
+  test('Wを押しながらA/Dも押すと、前進と旋回が同時に反映される', () => {
+    setCharacterFacing(0);
+    const facingBefore = getCharacterFacing();
+    const posBefore = getCharacterPosition().clone();
+
+    press('KeyW');
+    press('KeyD');
+    const isMoving = updateMovementInput(0.1);
+    release('KeyW');
+    release('KeyD');
+
+    expect(isMoving).toBe(true);
+    expect(getCharacterFacing()).toBeGreaterThan(facingBefore); // 旋回した
+    expect(getCharacterPosition().distanceTo(posBefore)).toBeGreaterThan(0); // 前進した
+  });
+});

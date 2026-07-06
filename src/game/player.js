@@ -4,7 +4,11 @@ import { playFootstep } from '../ambientAudio.js';
 import { getTouchMoveVector } from './touchControls.js';
 
 const MOVE_SPEED = 5; // units / sec
-const TURN_SMOOTHING = 10; // 大きいほど素早く向きを変える
+// A/Dキー（および仮想スティックの左右入力）でキャラ自身を直接回転させる
+// 角速度。フレームレートに依存せず(delta乗算のみ)、常に一定速度で滑らかに
+// 回転する「その場旋回」方式（W/Sは現在向いている方向への前進/後退のみを
+// 行い、A/Dの旋回とは独立している）。
+const TURN_SPEED = 4.2; // rad / sec（180度を約0.75秒で回りきる速さ）
 const CAMERA_SMOOTHING = 4; // 大きいほど素早くカメラが追従する
 const FOOTSTEP_INTERVAL = 0.35;
 
@@ -83,32 +87,43 @@ export function setHatColor(hex) {
 
 /**
  * WASD/矢印キーの入力を反映して移動・向き・歩行アニメーション・足音を更新する。
- * @returns {boolean} このフレームで移動していればtrue
+ *
+ * 操作方式（その場旋回・キー入力）：W/Sはキャラが「現在向いている方向」への
+ * 前進/後退のみを行い、A/Dはキャラ自身をその場で左右に回転させる
+ * （進行方向から向きを逆算する方式ではないため、A/Dだけを押したときの
+ * 回転がどちらを向いていても常に同じ体感速度になり、カメラも常に
+ * characterFacingに追従するため向きがズレない）。
+ * @returns {boolean} このフレームで実際に前進/後退していればtrue
  */
 export function updateMovementInput(delta) {
-  moveDirection.set(0, 0, 0);
-  if (isPressed('KeyW', 'ArrowUp')) moveDirection.z -= 1;
-  if (isPressed('KeyS', 'ArrowDown')) moveDirection.z += 1;
-  if (isPressed('KeyA', 'ArrowLeft')) moveDirection.x -= 1;
-  if (isPressed('KeyD', 'ArrowRight')) moveDirection.x += 1;
-
-  // タッチデバイスの仮想スティック入力をキーボードに合成する
-  // （キーボード入力がなければそのまま仮想スティックの向きが使われる）。
   const touch = getTouchMoveVector();
-  moveDirection.x += touch.x;
-  moveDirection.z += touch.z;
 
-  const isMoving = moveDirection.lengthSq() > 0.0001;
-  if (isMoving) {
-    moveDirection.normalize();
-    character.position.addScaledVector(moveDirection, MOVE_SPEED * delta);
+  // A/D（および仮想スティックの左右入力）：一定の角速度でその場旋回する。
+  let turnInput = 0;
+  if (isPressed('KeyA', 'ArrowLeft')) turnInput -= 1;
+  if (isPressed('KeyD', 'ArrowRight')) turnInput += 1;
+  turnInput += touch.x;
+  turnInput = THREE.MathUtils.clamp(turnInput, -1, 1);
 
-    // 移動方向を向くようにキャラを回転（滑らかに補間）
-    const targetFacing = Math.atan2(moveDirection.x, moveDirection.z);
-    let angleDiff = targetFacing - characterFacing;
-    angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
-    characterFacing += angleDiff * Math.min(1, TURN_SMOOTHING * delta);
+  if (turnInput !== 0) {
+    characterFacing += turnInput * TURN_SPEED * delta;
+    // 長時間旋回し続けても値が際限なく増え続けないよう -π〜πに正規化する。
+    characterFacing = Math.atan2(Math.sin(characterFacing), Math.cos(characterFacing));
     character.rotation.y = characterFacing;
+  }
+
+  // W/S（および仮想スティックの前後入力）：現在の向き(characterFacing)へ
+  // そのまま前進/後退する。
+  let moveInput = 0;
+  if (isPressed('KeyW', 'ArrowUp')) moveInput += 1;
+  if (isPressed('KeyS', 'ArrowDown')) moveInput -= 1;
+  moveInput -= touch.z; // スティックを上へ倒す(dyが負)ほど前進になるよう符号を反転
+  moveInput = THREE.MathUtils.clamp(moveInput, -1, 1);
+
+  const isMoving = Math.abs(moveInput) > 0.0001;
+  if (isMoving) {
+    moveDirection.set(Math.sin(characterFacing), 0, Math.cos(characterFacing));
+    character.position.addScaledVector(moveDirection, MOVE_SPEED * moveInput * delta);
   }
   characterController.updateWalkAnimation(isMoving, delta);
 
