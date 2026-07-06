@@ -167,7 +167,7 @@ export function updateInstanceAnimations(elapsed) {
     dummy.scale.set(
       Math.max(0.001, anim.targetScale.x * eased),
       Math.max(0.001, anim.targetScale.y * eased),
-      Math.max(0.001, anim.targetScale.z * eased)
+      Math.max(0.001, anim.targetScale.z * eased),
     );
     dummy.updateMatrix();
     anim.pool.mesh.setMatrixAt(anim.index, dummy.matrix);

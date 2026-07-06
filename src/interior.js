@@ -43,7 +43,11 @@ export function initInteriorRoom(scene) {
       geometry.rotateX(-Math.PI / 2);
       const material = new THREE.MeshStandardMaterial({ color: FLOOR_COLOR, flatShading: true });
       const tile = new THREE.Mesh(geometry, material);
-      tile.position.set(ox - half + tx * TILE_SIZE + TILE_SIZE / 2, 0, oz - half + ty * TILE_SIZE + TILE_SIZE / 2);
+      tile.position.set(
+        ox - half + tx * TILE_SIZE + TILE_SIZE / 2,
+        0,
+        oz - half + ty * TILE_SIZE + TILE_SIZE / 2,
+      );
       tile.userData = {
         localIndex: ty * ROOM_TILES + tx,
         tileType: 'grass',
@@ -58,9 +62,36 @@ export function initInteriorRoom(scene) {
   const ceilingMaterial = new THREE.MeshStandardMaterial({ color: CEILING_COLOR, flatShading: true });
 
   // 北壁・東壁・西壁
-  addBox(group, ROOM_SIZE, WALL_HEIGHT, WALL_THICKNESS, ox, WALL_HEIGHT / 2, oz - half - WALL_THICKNESS / 2, wallMaterial);
-  addBox(group, WALL_THICKNESS, WALL_HEIGHT, ROOM_SIZE, ox + half + WALL_THICKNESS / 2, WALL_HEIGHT / 2, oz, wallMaterial);
-  addBox(group, WALL_THICKNESS, WALL_HEIGHT, ROOM_SIZE, ox - half - WALL_THICKNESS / 2, WALL_HEIGHT / 2, oz, wallMaterial);
+  addBox(
+    group,
+    ROOM_SIZE,
+    WALL_HEIGHT,
+    WALL_THICKNESS,
+    ox,
+    WALL_HEIGHT / 2,
+    oz - half - WALL_THICKNESS / 2,
+    wallMaterial,
+  );
+  addBox(
+    group,
+    WALL_THICKNESS,
+    WALL_HEIGHT,
+    ROOM_SIZE,
+    ox + half + WALL_THICKNESS / 2,
+    WALL_HEIGHT / 2,
+    oz,
+    wallMaterial,
+  );
+  addBox(
+    group,
+    WALL_THICKNESS,
+    WALL_HEIGHT,
+    ROOM_SIZE,
+    ox - half - WALL_THICKNESS / 2,
+    WALL_HEIGHT / 2,
+    oz,
+    wallMaterial,
+  );
 
   // 南壁（中央に出入り口の隙間を空ける）
   const segmentWidth = (ROOM_SIZE - DOOR_WIDTH) / 2;
@@ -72,7 +103,7 @@ export function initInteriorRoom(scene) {
     ox - (DOOR_WIDTH / 2 + segmentWidth / 2),
     WALL_HEIGHT / 2,
     oz + half + WALL_THICKNESS / 2,
-    wallMaterial
+    wallMaterial,
   );
   addBox(
     group,
@@ -82,7 +113,7 @@ export function initInteriorRoom(scene) {
     ox + (DOOR_WIDTH / 2 + segmentWidth / 2),
     WALL_HEIGHT / 2,
     oz + half + WALL_THICKNESS / 2,
-    wallMaterial
+    wallMaterial,
   );
 
   // 天井

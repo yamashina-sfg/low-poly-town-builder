@@ -9,7 +9,7 @@ const particles = [];
  */
 export function spawnParticleBurst(
   scene,
-  { position, count = 8, color = 0xffffff, size = 0.08, speed = 2, life = 1, gravity = -3 }
+  { position, count = 8, color = 0xffffff, size = 0.08, speed = 2, life = 1, gravity = -3 },
 ) {
   for (let i = 0; i < count; i += 1) {
     const geometry = new THREE.PlaneGeometry(size, size);

@@ -2,7 +2,14 @@ import * as THREE from 'three';
 import { mulberry32 } from './random.js';
 import { addInstance } from './instancing.js';
 import { UNIT_BOX_POOL, UNIT_CYLINDER_POOL, UNIT_SPHERE_POOL, ZERO_ROTATION } from './primitives.js';
-import { WOOD_COLOR, DARK_METAL_COLOR, LAMP_HEAD_COLOR, FLOWER_COLORS, SOIL_COLOR, SIGN_BOARD_COLOR } from './palette.js';
+import {
+  WOOD_COLOR,
+  DARK_METAL_COLOR,
+  LAMP_HEAD_COLOR,
+  FLOWER_COLORS,
+  SOIL_COLOR,
+  SIGN_BOARD_COLOR,
+} from './palette.js';
 
 function pick(rng, colors) {
   return colors[Math.floor(rng() * colors.length)];
@@ -23,8 +30,8 @@ export function generateFence(seed, tilePosition, { animate = true } = {}) {
         ZERO_ROTATION,
         new THREE.Vector3(0.05, 0.5, 0.05),
         woodColor,
-        { animate }
-      )
+        { animate },
+      ),
     );
   });
 
@@ -36,8 +43,8 @@ export function generateFence(seed, tilePosition, { animate = true } = {}) {
         ZERO_ROTATION,
         new THREE.Vector3(1.8, 0.06, 0.06),
         woodColor,
-        { animate }
-      )
+        { animate },
+      ),
     );
   });
 
@@ -58,8 +65,8 @@ export function generateStreetlamp(seed, tilePosition, { animate = true } = {}) 
       ZERO_ROTATION,
       new THREE.Vector3(0.05, 1.6, 0.05),
       poleColor,
-      { animate }
-    )
+      { animate },
+    ),
   );
 
   const lampColor = new THREE.Color(LAMP_HEAD_COLOR);
@@ -70,8 +77,8 @@ export function generateStreetlamp(seed, tilePosition, { animate = true } = {}) 
       ZERO_ROTATION,
       new THREE.Vector3(0.18, 0.18, 0.18),
       lampColor,
-      { animate }
-    )
+      { animate },
+    ),
   );
 
   return { kind: 'instances', parts };
@@ -92,8 +99,8 @@ export function generateBench(seed, tilePosition, { animate = true } = {}) {
       ZERO_ROTATION,
       new THREE.Vector3(1.2, 0.08, 0.4),
       woodColor,
-      { animate }
-    )
+      { animate },
+    ),
   );
   parts.push(
     addInstance(
@@ -102,8 +109,8 @@ export function generateBench(seed, tilePosition, { animate = true } = {}) {
       ZERO_ROTATION,
       new THREE.Vector3(1.2, 0.35, 0.06),
       woodColor,
-      { animate }
-    )
+      { animate },
+    ),
   );
 
   [-0.5, 0.5].forEach((ox) => {
@@ -114,8 +121,8 @@ export function generateBench(seed, tilePosition, { animate = true } = {}) {
         ZERO_ROTATION,
         new THREE.Vector3(0.08, 0.3, 0.35),
         legColor,
-        { animate }
-      )
+        { animate },
+      ),
     );
   });
 
@@ -137,8 +144,8 @@ export function generateFlowerbed(seed, tilePosition, { animate = true } = {}) {
       ZERO_ROTATION,
       new THREE.Vector3(1.5, 0.15, 1.5),
       soilColor,
-      { animate }
-    )
+      { animate },
+    ),
   );
 
   const flowerCount = 6 + Math.floor(rng() * 4);
@@ -153,8 +160,8 @@ export function generateFlowerbed(seed, tilePosition, { animate = true } = {}) {
         ZERO_ROTATION,
         new THREE.Vector3(0.12, 0.12, 0.12),
         color,
-        { animate }
-      )
+        { animate },
+      ),
     );
   }
 
@@ -175,8 +182,8 @@ export function generateSignpost(seed, tilePosition, { animate = true } = {}) {
       ZERO_ROTATION,
       new THREE.Vector3(0.06, 1.0, 0.06),
       woodColor,
-      { animate }
-    )
+      { animate },
+    ),
   );
 
   const boardColor = new THREE.Color(SIGN_BOARD_COLOR);
@@ -187,8 +194,8 @@ export function generateSignpost(seed, tilePosition, { animate = true } = {}) {
       ZERO_ROTATION,
       new THREE.Vector3(0.5, 0.35, 0.05),
       boardColor,
-      { animate }
-    )
+      { animate },
+    ),
   );
 
   return { kind: 'instances', parts };

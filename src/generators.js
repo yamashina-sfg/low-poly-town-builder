@@ -29,7 +29,7 @@ function pick(rng, colors) {
  * 同じseedを渡せば常に同じ建物になる（決定論的）。
  * @returns {{ kind: 'instances', parts: Array<{key: string, index: number}> }}
  */
-export function generateBuilding(seed, type = 'house', tilePosition, { animate = true } = {}) {
+export function generateBuilding(seed, _type = 'house', tilePosition, { animate = true } = {}) {
   const rng = mulberry32(seed);
   const parts = [];
 
@@ -79,9 +79,7 @@ export function generateTree(seed, type, tilePosition, { animate = true } = {}) 
   const trunkColor = new THREE.Color(TRUNK_COLOR);
   const trunkPosition = new THREE.Vector3(tilePosition.x, 0, tilePosition.z);
   const trunkScale = new THREE.Vector3(1, trunkHeight, 1);
-  parts.push(
-    addInstance(UNIT_TRUNK_POOL, trunkPosition, ZERO_ROTATION, trunkScale, trunkColor, { animate })
-  );
+  parts.push(addInstance(UNIT_TRUNK_POOL, trunkPosition, ZERO_ROTATION, trunkScale, trunkColor, { animate }));
 
   if (resolvedType === 'conifer') {
     const tiers = 2 + Math.floor(rng() * 2); // 2〜3段
@@ -110,7 +108,7 @@ export function generateTree(seed, type, tilePosition, { animate = true } = {}) 
       const position = new THREE.Vector3(
         tilePosition.x + offsetX,
         trunkHeight + 0.2 + offsetY,
-        tilePosition.z + offsetZ
+        tilePosition.z + offsetZ,
       );
       const scale = new THREE.Vector3(radius, radius, radius);
       parts.push(addInstance(UNIT_SPHERE_POOL, position, ZERO_ROTATION, scale, color, { animate }));

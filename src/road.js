@@ -38,7 +38,7 @@ export function generateRoad(tilePosition, connections, { animate = false } = {}
   const basePosition = new THREE.Vector3(tilePosition.x, 0.02, tilePosition.z);
   const baseScale = new THREE.Vector3(TILE_SIZE, 0.02, TILE_SIZE);
   parts.push(
-    addInstance(UNIT_BOX_POOL, basePosition, ZERO_ROTATION, baseScale, ROAD_BASE_COLOR, { animate })
+    addInstance(UNIT_BOX_POOL, basePosition, ZERO_ROTATION, baseScale, ROAD_BASE_COLOR, { animate }),
   );
 
   DIRECTIONS.forEach(({ key, dx, dz }) => {
@@ -55,7 +55,7 @@ export function generateRoad(tilePosition, connections, { animate = false } = {}
       const position = new THREE.Vector3(
         tilePosition.x + dx * TILE_SIZE * t,
         0.04,
-        tilePosition.z + dz * TILE_SIZE * t
+        tilePosition.z + dz * TILE_SIZE * t,
       );
       parts.push(addInstance(UNIT_BOX_POOL, position, ZERO_ROTATION, scale, ROAD_LINE_COLOR, { animate }));
     }

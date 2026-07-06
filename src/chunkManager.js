@@ -149,7 +149,11 @@ function unloadChunk(cx, cy, { worldSeed, onTileDispose }) {
  * 実際に解放される。
  * @returns 現在キャラクターがいるチャンク座標
  */
-export function updateChunkStreaming(worldX, worldZ, { worldSeed, onProceduralTile, onRestoreTile, onTileDispose }) {
+export function updateChunkStreaming(
+  worldX,
+  worldZ,
+  { worldSeed, onProceduralTile, onRestoreTile, onTileDispose },
+) {
   const { cx, cy } = worldToChunkCoords(worldX, worldZ);
 
   for (let dy = -LOAD_RADIUS; dy <= LOAD_RADIUS; dy += 1) {

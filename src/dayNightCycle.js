@@ -26,16 +26,12 @@ export function updateDayNightCycle({ dayFraction, scene, dirLight, hemiLight })
   const warmth = Math.max(0, 1 - Math.abs(sunHeight) * 1.6) * (sunHeight > -0.6 ? 1 : 0);
 
   dirLight.position.set(Math.cos(angle) * 15, Math.max(sunHeight, 0.05) * 20, 10);
-  dirLight.color
-    .copy(tmpColor.copy(NIGHT_SUN).lerp(DAY_SUN, dayFactor))
-    .lerp(DAWN_DUSK_SUN, warmth * 0.7);
+  dirLight.color.copy(tmpColor.copy(NIGHT_SUN).lerp(DAY_SUN, dayFactor)).lerp(DAWN_DUSK_SUN, warmth * 0.7);
   dirLight.intensity = THREE.MathUtils.lerp(0.15, 1.2, dayFactor);
 
   hemiLight.color.copy(tmpColor.copy(NIGHT_HEMI_SKY).lerp(DAY_HEMI_SKY, dayFactor));
   hemiLight.groundColor.copy(tmpColor.copy(NIGHT_HEMI_GROUND).lerp(DAY_HEMI_GROUND, dayFactor));
   hemiLight.intensity = THREE.MathUtils.lerp(0.25, 1.1, dayFactor);
 
-  scene.background
-    .copy(tmpColor.copy(NIGHT_SKY).lerp(DAY_SKY, dayFactor))
-    .lerp(DAWN_DUSK_SUN, warmth * 0.25);
+  scene.background.copy(tmpColor.copy(NIGHT_SKY).lerp(DAY_SKY, dayFactor)).lerp(DAWN_DUSK_SUN, warmth * 0.25);
 }

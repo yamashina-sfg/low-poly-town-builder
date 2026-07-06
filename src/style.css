@@ -165,7 +165,9 @@ canvas {
   height: 100%;
   width: 0%;
   background: #6fae5c;
-  transition: width 0.2s linear, background-color 0.2s linear;
+  transition:
+    width 0.2s linear,
+    background-color 0.2s linear;
 }
 
 .debug-panel {

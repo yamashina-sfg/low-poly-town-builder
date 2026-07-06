@@ -21,7 +21,7 @@ export function createBird({ centerX, centerZ, height = 5, radius = 4, speed = 1
     mesh.position.set(
       centerX + Math.cos(angle) * radius,
       height + Math.sin(elapsed * 2 + phase) * 0.3,
-      centerZ + Math.sin(angle) * radius
+      centerZ + Math.sin(angle) * radius,
     );
     // 円軌道の接線方向を向く
     const tangent = angle + (direction > 0 ? Math.PI / 2 : -Math.PI / 2);

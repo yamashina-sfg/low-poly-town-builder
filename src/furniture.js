@@ -26,8 +26,8 @@ export function generateBed(seed, tilePosition, { animate = true } = {}) {
       ZERO_ROTATION,
       new THREE.Vector3(1.2, 0.15, 0.7),
       frameColor,
-      { animate }
-    )
+      { animate },
+    ),
   );
   parts.push(
     addInstance(
@@ -36,8 +36,8 @@ export function generateBed(seed, tilePosition, { animate = true } = {}) {
       ZERO_ROTATION,
       new THREE.Vector3(1.1, 0.15, 0.6),
       sheetColor,
-      { animate }
-    )
+      { animate },
+    ),
   );
   parts.push(
     addInstance(
@@ -46,8 +46,8 @@ export function generateBed(seed, tilePosition, { animate = true } = {}) {
       ZERO_ROTATION,
       new THREE.Vector3(0.3, 0.1, 0.2),
       new THREE.Color(0xffffff),
-      { animate }
-    )
+      { animate },
+    ),
   );
 
   return { kind: 'instances', parts };
@@ -67,8 +67,8 @@ export function generateTable(seed, tilePosition, { animate = true } = {}) {
       ZERO_ROTATION,
       new THREE.Vector3(1.0, 0.08, 0.7),
       woodColor,
-      { animate }
-    )
+      { animate },
+    ),
   );
 
   [
@@ -84,8 +84,8 @@ export function generateTable(seed, tilePosition, { animate = true } = {}) {
         ZERO_ROTATION,
         new THREE.Vector3(0.05, 0.45, 0.05),
         woodColor,
-        { animate }
-      )
+        { animate },
+      ),
     );
   });
 
@@ -106,8 +106,8 @@ export function generateChair(seed, tilePosition, { animate = true } = {}) {
       ZERO_ROTATION,
       new THREE.Vector3(0.4, 0.06, 0.4),
       woodColor,
-      { animate }
-    )
+      { animate },
+    ),
   );
   parts.push(
     addInstance(
@@ -116,8 +116,8 @@ export function generateChair(seed, tilePosition, { animate = true } = {}) {
       ZERO_ROTATION,
       new THREE.Vector3(0.4, 0.4, 0.06),
       woodColor,
-      { animate }
-    )
+      { animate },
+    ),
   );
 
   [
@@ -133,8 +133,8 @@ export function generateChair(seed, tilePosition, { animate = true } = {}) {
         ZERO_ROTATION,
         new THREE.Vector3(0.04, 0.35, 0.04),
         woodColor,
-        { animate }
-      )
+        { animate },
+      ),
     );
   });
 
@@ -155,8 +155,8 @@ export function generateFireplace(seed, tilePosition, { animate = true } = {}) {
       ZERO_ROTATION,
       new THREE.Vector3(0.9, 0.6, 0.5),
       stoneColor,
-      { animate }
-    )
+      { animate },
+    ),
   );
   parts.push(
     addInstance(
@@ -165,8 +165,8 @@ export function generateFireplace(seed, tilePosition, { animate = true } = {}) {
       ZERO_ROTATION,
       new THREE.Vector3(0.35, 0.8, 0.35),
       stoneColor,
-      { animate }
-    )
+      { animate },
+    ),
   );
 
   const fireColor = new THREE.Color(FIRE_GLOW_COLOR);
@@ -177,8 +177,8 @@ export function generateFireplace(seed, tilePosition, { animate = true } = {}) {
       ZERO_ROTATION,
       new THREE.Vector3(0.2, 0.2, 0.2),
       fireColor,
-      { animate }
-    )
+      { animate },
+    ),
   );
 
   return { kind: 'instances', parts };

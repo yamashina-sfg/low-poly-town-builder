@@ -1,12 +1,7 @@
 import * as THREE from 'three';
 import { mulberry32 } from './random.js';
 import { addInstance } from './instancing.js';
-import {
-  UNIT_BOX_POOL,
-  UNIT_CONE_SQUARE_POOL,
-  UNIT_CYLINDER_POOL,
-  ZERO_ROTATION,
-} from './primitives.js';
+import { UNIT_BOX_POOL, UNIT_CONE_SQUARE_POOL, UNIT_CYLINDER_POOL, ZERO_ROTATION } from './primitives.js';
 import {
   BUILDING_ROOF_COLORS,
   SHOP_WALL_COLORS,
@@ -44,10 +39,12 @@ export function generateShop(seed, tilePosition, { animate = true } = {}) {
   const awningPosition = new THREE.Vector3(
     tilePosition.x,
     FLOOR_HEIGHT * 0.85,
-    tilePosition.z + width * 0.55
+    tilePosition.z + width * 0.55,
   );
   const awningScale = new THREE.Vector3(width * 1.1, 0.08, width * 0.5);
-  parts.push(addInstance(UNIT_BOX_POOL, awningPosition, ZERO_ROTATION, awningScale, awningColor, { animate }));
+  parts.push(
+    addInstance(UNIT_BOX_POOL, awningPosition, ZERO_ROTATION, awningScale, awningColor, { animate }),
+  );
 
   const roofColor = new THREE.Color(pick(rng, BUILDING_ROOF_COLORS));
   const roofPosition = new THREE.Vector3(tilePosition.x, currentY, tilePosition.z);
@@ -72,8 +69,8 @@ export function generateWell(seed, tilePosition, { animate = true } = {}) {
       ZERO_ROTATION,
       new THREE.Vector3(0.5, 0.5, 0.5),
       stoneColor,
-      { animate }
-    )
+      { animate },
+    ),
   );
 
   const postColor = new THREE.Color(WOOD_COLOR);
@@ -85,8 +82,8 @@ export function generateWell(seed, tilePosition, { animate = true } = {}) {
         ZERO_ROTATION,
         new THREE.Vector3(0.06, 0.6, 0.06),
         postColor,
-        { animate }
-      )
+        { animate },
+      ),
     );
   });
 
@@ -98,8 +95,8 @@ export function generateWell(seed, tilePosition, { animate = true } = {}) {
       new THREE.Euler(0, Math.PI / 4, 0),
       new THREE.Vector3(0.6, 0.4, 0.6),
       roofColor,
-      { animate }
-    )
+      { animate },
+    ),
   );
 
   return { kind: 'instances', parts };
@@ -124,8 +121,8 @@ export function generateWarehouse(seed, tilePosition, { animate = true } = {}) {
       ZERO_ROTATION,
       new THREE.Vector3(width, height, depth),
       wallColor,
-      { animate }
-    )
+      { animate },
+    ),
   );
 
   const roofColor = new THREE.Color(pick(rng, BUILDING_ROOF_COLORS));
@@ -136,8 +133,8 @@ export function generateWarehouse(seed, tilePosition, { animate = true } = {}) {
       ZERO_ROTATION,
       new THREE.Vector3(width * 1.05, 0.2, depth * 1.05),
       roofColor,
-      { animate }
-    )
+      { animate },
+    ),
   );
 
   return { kind: 'instances', parts };

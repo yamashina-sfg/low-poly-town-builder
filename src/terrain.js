@@ -46,7 +46,7 @@ export function createChunkTiles(chunkX, chunkY) {
       const position = new THREE.Vector3(
         originX + TILE_SIZE * localX + TILE_SIZE / 2,
         0,
-        originZ + TILE_SIZE * localY + TILE_SIZE / 2
+        originZ + TILE_SIZE * localY + TILE_SIZE / 2,
       );
       const groundHandle = addInstance(GROUND_TILE_POOL, position, ZERO_ROTATION, scale, BASE_COLOR);
 
