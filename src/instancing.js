@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { easeOutBack } from './easing.js';
 
-// 建物・木・道路のパーツは種類ごとに1つのInstancedMeshへ集約する。
+// 建物・木・道路・地面タイルのパーツは種類ごとに1つのInstancedMeshへ集約する。
 // ジオメトリは「底面を原点に置いた単位形状」を共有し、位置・回転・
 // 非一様スケール・インスタンスカラーだけで見た目のバリエーションを表現する。
 
-const MAX_INSTANCES_PER_POOL = 2000;
+const INITIAL_CAPACITY = 2000;
+const GROWTH_FACTOR = 2;
 const GROW_DURATION = 0.35; // 秒
 
 // 底面ピボットの単位ボックス。建物の壁・平屋根・道路が共有する。
@@ -14,15 +15,56 @@ export const UNIT_BOX_POOL = 'unit-box';
 const pools = new Map();
 const dummy = new THREE.Object3D();
 const growAnimations = [];
+let sceneRef = null;
+
+/**
+ * プールの追加インスタンスをシーンに反映させるための参照を登録する。
+ * プール登録時点ではまだsceneが存在しないことがあるため、
+ * 起動時に一度呼んでおけば、後からプールが拡張されたときも
+ * 新しいInstancedMeshが自動的にシーンに追加される。
+ */
+export function setInstancingScene(scene) {
+  sceneRef = scene;
+}
 
 function createPool(key, geometry, material) {
-  const mesh = new THREE.InstancedMesh(geometry, material, MAX_INSTANCES_PER_POOL);
+  const mesh = new THREE.InstancedMesh(geometry, material, INITIAL_CAPACITY);
   mesh.count = 0;
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   mesh.frustumCulled = false;
-  const pool = { mesh, freeList: [], activeCount: 0 };
+  const pool = { mesh, geometry, material, freeList: [], activeCount: 0, capacity: INITIAL_CAPACITY };
   pools.set(key, pool);
   return pool;
+}
+
+/**
+ * プールの容量を超えた場合、より大きなInstancedMeshへ既存のインスタンス
+ * （行列・カラー）をコピーして差し替える。これにより、上限に達しても
+ * 新規インスタンスがサイレントに反映されなくなる不具合を防ぐ。
+ */
+function growPool(pool) {
+  const newCapacity = pool.capacity * GROWTH_FACTOR;
+  const newMesh = new THREE.InstancedMesh(pool.geometry, pool.material, newCapacity);
+  newMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  newMesh.frustumCulled = false;
+  newMesh.count = pool.mesh.count;
+
+  newMesh.instanceMatrix.array.set(pool.mesh.instanceMatrix.array);
+  newMesh.instanceMatrix.needsUpdate = true;
+
+  if (pool.mesh.instanceColor) {
+    newMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(newCapacity * 3), 3);
+    newMesh.instanceColor.array.set(pool.mesh.instanceColor.array);
+    newMesh.instanceColor.needsUpdate = true;
+  }
+
+  if (sceneRef) {
+    sceneRef.remove(pool.mesh);
+    sceneRef.add(newMesh);
+  }
+
+  pool.mesh = newMesh;
+  pool.capacity = newCapacity;
 }
 
 export function registerPool(key, geometry, material) {
@@ -30,6 +72,10 @@ export function registerPool(key, geometry, material) {
     createPool(key, geometry, material);
   }
   return pools.get(key).mesh;
+}
+
+export function getPoolMesh(key) {
+  return pools.get(key)?.mesh ?? null;
 }
 
 /**
@@ -43,6 +89,9 @@ export function addInstance(key, position, rotation, scale, color, { animate = f
   if (pool.freeList.length > 0) {
     index = pool.freeList.pop();
   } else {
+    if (pool.activeCount >= pool.capacity) {
+      growPool(pool);
+    }
     index = pool.activeCount;
     pool.activeCount += 1;
   }
@@ -91,6 +140,16 @@ export function removeInstance({ key, index }) {
   pool.mesh.setMatrixAt(index, dummy.matrix);
   pool.mesh.instanceMatrix.needsUpdate = true;
   pool.freeList.push(index);
+}
+
+/**
+ * 行列（位置・回転・スケール）には触れず、インスタンスカラーだけを
+ * 更新する。タイルのホバーハイライトなど、色だけ変えたい場合に使う。
+ */
+export function setInstanceColor({ key, index }, color) {
+  const pool = pools.get(key);
+  pool.mesh.setColorAt(index, color);
+  if (pool.mesh.instanceColor) pool.mesh.instanceColor.needsUpdate = true;
 }
 
 /**

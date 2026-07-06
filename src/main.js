@@ -1,14 +1,19 @@
 import * as THREE from 'three';
-import { setTileHighlighted, TILE_SIZE } from './terrain.js';
 import {
-  ensureChunksAround,
+  setTileHighlighted,
+  getGroundInstancedMesh,
+  getTileByGroundInstanceId,
+  TILE_SIZE,
+} from './terrain.js';
+import {
   ensureChunkForGlobalTile,
+  updateChunkStreaming,
   getGlobalTile,
   getLoadedChunkCount,
   forEachLoadedTile,
-  updateChunkVisibility,
-  getVisibleTileMeshes,
+  worldToChunkCoords,
   worldToGlobalTileCoords,
+  CHUNK_SIZE,
 } from './chunkManager.js';
 import { resolveCollisionAgainstTiles, pushEntitiesApart } from './collision.js';
 import { showBuildMenu, hideBuildMenu } from './buildMenu.js';
@@ -24,7 +29,13 @@ import {
 } from './decorations.js';
 import { generateRoad, computeRoadConnections } from './road.js';
 import { generateWater, updateWaterTime } from './water.js';
-import { getAllPoolMeshes, removeInstance, getInstanceCount, updateInstanceAnimations } from './instancing.js';
+import {
+  getAllPoolMeshes,
+  removeInstance,
+  getInstanceCount,
+  updateInstanceAnimations,
+  setInstancingScene,
+} from './instancing.js';
 import {
   initDebugPanel,
   updateDebugStats,
@@ -121,6 +132,22 @@ const PROCEDURAL_GENERATORS = {
 const BUILDING_TYPES = new Set(['house', 'shop', 'well', 'warehouse']);
 const FURNITURE_TYPES = new Set(['bed', 'table', 'chair', 'fireplace']);
 
+// 建物数・木の数は毎回全タイルを舐めて数え直すのではなく、
+// タイル種別が変わった瞬間に増減させるインクリメンタルなカウンターで管理する
+// （チャンクが増えても集計コストが増えないようにするため）。
+let liveBuildingCount = 0;
+let liveTreeCount = 0;
+
+function trackTileTypeAdded(type) {
+  if (BUILDING_TYPES.has(type)) liveBuildingCount += 1;
+  if (type === 'tree') liveTreeCount += 1;
+}
+
+function trackTileTypeRemoved(type) {
+  if (BUILDING_TYPES.has(type)) liveBuildingCount -= 1;
+  if (type === 'tree') liveTreeCount -= 1;
+}
+
 // ベッド・木・お店が置かれているタイル（屋内外どちらも）を追跡し、
 // キャラが近づいたときに「眠る/伐採する/お店を開く」操作を出せるようにする。
 const bedTiles = new Set();
@@ -207,16 +234,38 @@ function handleProceduralTile(tile, type) {
   buildOnTile(tile, type, { animate: false });
 }
 
-let lastCharacterChunk = ensureChunksAround(
-  0,
-  0,
-  { scene, worldSeed, onProceduralTile: handleProceduralTile },
-  1
-);
-updateChunkVisibility(0, 0);
+/**
+ * 以前アンロードされ差分キャッシュに残っていたタイル（プレイヤーが手を
+ * 加えたもの）を、チャンク再訪時に復元する。セーブデータ読込時のセル
+ * 復元とも共通のロジック。
+ */
+function handleRestoreTile(tile, type, furniture) {
+  buildOnTile(tile, type, { animate: false });
+  if (type === 'house' && Array.isArray(furniture)) {
+    tile.userData.indoorFurniture = furniture.slice();
+  }
+}
 
-// 建物・木・道路が使うInstancedMeshプールをシーンに追加
+/**
+ * チャンクがアンロードされる際、タイルに置かれていた建物・木などの
+ * InstancedMeshインスタンスを解放し、集計カウンターからも取り除く。
+ */
+function handleTileDispose(tile) {
+  trackTileTypeRemoved(tile.userData.tileType);
+  clearTileObject(tile);
+}
+
+// 建物・木・道路・地面タイルが使うInstancedMeshプールをシーンに追加し、
+// 以後プールが動的に拡張されたときも自動でシーンに反映されるようにする
+setInstancingScene(scene);
 getAllPoolMeshes().forEach((mesh) => scene.add(mesh));
+
+let lastCharacterChunk = updateChunkStreaming(0, 0, {
+  worldSeed,
+  onProceduralTile: handleProceduralTile,
+  onRestoreTile: handleRestoreTile,
+  onTileDispose: handleTileDispose,
+});
 
 // ------------------------------------------------------------------
 // キャラクター（腕・脚のあるローポリ人型。服・帽子の色は変更可能）
@@ -323,9 +372,19 @@ function updatePointerFromEvent(event) {
 function getIntersectedTile(event) {
   updatePointerFromEvent(event);
   raycaster.setFromCamera(pointer, camera);
-  const candidates = indoorMode ? indoorTiles : getVisibleTileMeshes();
-  const intersects = raycaster.intersectObjects(candidates, false);
-  return intersects.length > 0 ? intersects[0].object : null;
+
+  if (indoorMode) {
+    const intersects = raycaster.intersectObjects(indoorTiles, false);
+    return intersects.length > 0 ? intersects[0].object : null;
+  }
+
+  // 屋外の地面はチャンクをまたいだ1つのInstancedMeshなので、
+  // レイキャスト結果のinstanceIdから対応するタイルを逆引きする。
+  const groundMesh = getGroundInstancedMesh();
+  if (!groundMesh) return null;
+  const intersects = raycaster.intersectObject(groundMesh, false);
+  if (intersects.length === 0) return null;
+  return getTileByGroundInstanceId(intersects[0].instanceId);
 }
 
 /**
@@ -378,7 +437,9 @@ function refreshRoadTile(tile) {
  */
 function buildOnTile(tile, type, { animate = true } = {}) {
   clearTileObject(tile);
+  trackTileTypeRemoved(tile.userData.tileType);
   tile.userData.tileType = type === 'clear' ? 'grass' : type;
+  trackTileTypeAdded(tile.userData.tileType);
 
   if (type === 'house') {
     // 住居タイルは室内の家具配置(9マス分)を保持する。既存の住居を建て直しても消えない。
@@ -473,6 +534,14 @@ function snapCameraToCharacter() {
 
 function enterHouse(houseTile) {
   if (indoorMode) return;
+  // ホバー中のタイル参照を、切り替わる前の（屋外の）ハイライト関数で
+  // きちんと消灯してからリセットする（そのまま残すと、次にホバーが
+  // 動いたときに屋内のハイライト関数が屋外タイルへ誤って呼ばれてしまう）
+  if (hoveredTile) {
+    setTileHighlighted(hoveredTile, false);
+    hoveredTile = null;
+  }
+
   outdoorReturnPosition.copy(character.position);
   outdoorReturnFacing = characterFacing;
   enteredHouseTile = houseTile;
@@ -491,6 +560,11 @@ function enterHouse(houseTile) {
 
 function exitHouse() {
   if (!indoorMode) return;
+  if (hoveredTile) {
+    setIndoorTileHighlighted(hoveredTile, false);
+    hoveredTile = null;
+  }
+
   indoorMode = false;
   enteredHouseTile = null;
 
@@ -583,15 +657,15 @@ function handleActionKey() {
 }
 
 function getTownStats() {
-  let buildingCount = 0;
-  let treeCount = 0;
-  let tileCount = 0;
-  forEachLoadedTile((tile) => {
-    tileCount += 1;
-    if (BUILDING_TYPES.has(tile.userData.tileType)) buildingCount += 1;
-    if (tile.userData.tileType === 'tree') treeCount += 1;
-  });
-  return { tileCount, buildingCount, treeCount, chunkCount: getLoadedChunkCount() };
+  // 全タイルを舐めるO(n)処理ではなく、チャンク数からの計算とインクリメンタルな
+  // カウンターだけで求める（探索が進んでも集計コストが増えない）。
+  const chunkCount = getLoadedChunkCount();
+  return {
+    tileCount: chunkCount * CHUNK_SIZE * CHUNK_SIZE,
+    buildingCount: liveBuildingCount,
+    treeCount: liveTreeCount,
+    chunkCount,
+  };
 }
 
 function resetTown() {
@@ -633,13 +707,10 @@ function handleLoad() {
   }
 
   data.cells.forEach((cell) => {
-    ensureChunkForGlobalTile(cell.x, cell.y, { scene, worldSeed, onProceduralTile: handleProceduralTile });
+    ensureChunkForGlobalTile(cell.x, cell.y, { worldSeed, onProceduralTile: handleProceduralTile });
     const tile = getGlobalTile(cell.x, cell.y);
     if (!tile) return;
-    buildOnTile(tile, cell.type, { animate: false });
-    if (cell.type === 'house' && Array.isArray(cell.furniture)) {
-      tile.userData.indoorFurniture = cell.furniture.slice();
-    }
+    handleRestoreTile(tile, cell.type, cell.furniture);
   });
   showStatusMessage('読み込みました');
 }
@@ -898,16 +969,16 @@ function animate() {
     resolveOutdoorCollision(character.position, PLAYER_COLLISION_RADIUS);
 
     if (isMoving) {
-      // キャラが今いるチャンクが変わったら、周囲3x3チャンクの生成漏れを埋め、
-      // 遠くのチャンクは非表示にして描画をスキップする
-      const currentChunk = ensureChunksAround(
-        character.position.x,
-        character.position.z,
-        { scene, worldSeed, onProceduralTile: handleProceduralTile }
-      );
-      if (currentChunk.cx !== lastCharacterChunk.cx || currentChunk.cy !== lastCharacterChunk.cy) {
-        updateChunkVisibility(character.position.x, character.position.z);
-        lastCharacterChunk = currentChunk;
+      // キャラが今いるチャンクが変わったときだけ、周囲3x3チャンクの生成漏れを
+      // 埋め、それより外側のチャンクは実際にアンロード（破棄）する
+      const currentChunkCoords = worldToChunkCoords(character.position.x, character.position.z);
+      if (currentChunkCoords.cx !== lastCharacterChunk.cx || currentChunkCoords.cy !== lastCharacterChunk.cy) {
+        lastCharacterChunk = updateChunkStreaming(character.position.x, character.position.z, {
+          worldSeed,
+          onProceduralTile: handleProceduralTile,
+          onRestoreTile: handleRestoreTile,
+          onTileDispose: handleTileDispose,
+        });
       }
     }
 
