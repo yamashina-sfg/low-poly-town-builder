@@ -20,7 +20,8 @@ import { spawnSparkle, updateParticles } from './particles.js';
 import { updateWaterTime } from './water.js';
 import { initMinimap, updateMinimap } from './minimap.js';
 import { initInteriorRoom, INTERIOR_OFFSET, ROOM_SIZE } from './interior.js';
-import { hideBuildMenu, updateLockedButtons } from './buildMenu.js';
+import { hideBuildMenu, updateButtonStates } from './buildMenu.js';
+import { getWood, getMoney } from './economy.js';
 import { forEachLoadedTile } from './chunkManager.js';
 
 import {
@@ -58,6 +59,8 @@ import { initPopulace, updatePopulace, resolvePopulaceInterCollisions } from './
 import { showStatusMessage } from './game/statusMessage.js';
 import { updateResourcePanel } from './game/resourcePanel.js';
 import { updateProgression, recordLandmarkDiscovered, getCurrentLockedTypes } from './game/progression.js';
+import { initOnboarding } from './game/onboarding.js';
+import { initTouchControls } from './game/touchControls.js';
 
 // ------------------------------------------------------------------
 // シーン基本セットアップ
@@ -124,6 +127,7 @@ setLandmarkDiscoveredHandler(recordLandmarkDiscovered);
 // ------------------------------------------------------------------
 initPlayer(scene, camera, { clothingColor: 0x3b6ea5, hatColor: 0xb5533c });
 initPopulace(scene);
+initTouchControls();
 
 const outdoorReturnPosition = new THREE.Vector3();
 let outdoorReturnFacing = 0;
@@ -210,6 +214,8 @@ initDebugPanel({
   onHatColorChange: setHatColor,
 });
 
+initOnboarding();
+
 // ブラウザの自動再生ポリシーのため、最初のキー入力/クリックで環境音を開始する
 function beginAudioOnFirstInteraction() {
   startAmbientAudio();
@@ -261,7 +267,7 @@ function animate() {
     updateTimeAndSleepiness(formatGameTime(), Math.round(getSleepiness()));
     updateResourcePanel();
     updateProgression();
-    updateLockedButtons(getCurrentLockedTypes());
+    updateButtonStates({ lockedTypes: getCurrentLockedTypes(), wood: getWood(), money: getMoney() });
     fpsFrameCount = 0;
     fpsElapsed = 0;
   }

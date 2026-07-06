@@ -13,9 +13,16 @@ const resetButton = document.getElementById('reset-button');
 const muteButton = document.getElementById('mute-button');
 const clothingColorInput = document.getElementById('clothing-color-input');
 const hatColorInput = document.getElementById('hat-color-input');
+const debugInfoPanel = document.getElementById('debug-info-panel');
+
+function toggleDebugInfoPanel() {
+  debugInfoPanel?.classList.toggle('hidden');
+}
 
 /**
  * デバッグパネルのボタン・シード入力欄・キャラ色選択にイベントを登録する。
+ * プレイヤー向け設定パネルは常時表示、デバッグ情報パネル（FPS・チャンク数
+ * など）はデフォルトで非表示にし、F3キーでのみ開閉できるようにする。
  */
 export function initDebugPanel({
   onSave,
@@ -36,6 +43,13 @@ export function initDebugPanel({
   muteButton.addEventListener('click', onToggleMute);
   clothingColorInput.addEventListener('input', () => onClothingColorChange(clothingColorInput.value));
   hatColorInput.addEventListener('input', () => onHatColorChange(hatColorInput.value));
+
+  window.addEventListener('keydown', (event) => {
+    if (event.code === 'F3') {
+      event.preventDefault();
+      toggleDebugInfoPanel();
+    }
+  });
 }
 
 export function setMuteButtonLabel(muted) {

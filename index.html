@@ -12,6 +12,18 @@
       <div id="reputation-title">静かな原っぱ</div>
       <div>評判: <span id="reputation-score">0</span></div>
     </div>
+    <div id="onboarding-overlay" class="onboarding-overlay hidden">
+      <div class="onboarding-card">
+        <h2>ようこそ、ローポリタウンビルダーへ</h2>
+        <ul>
+          <li><strong>WASD / 矢印キー</strong>：移動</li>
+          <li><strong>クリック</strong>：タイルを選んで建築</li>
+          <li><strong>Eキー</strong>：ベッド・木・お店などを操作</li>
+          <li><strong>Escキー</strong>：住居の外に出る</li>
+        </ul>
+        <button type="button" id="onboarding-close">はじめる</button>
+      </div>
+    </div>
     <button type="button" id="exit-building-button" class="exit-building-button hidden">
       外に出る (Esc)
     </button>
@@ -22,6 +34,9 @@
       <div>💰 <span id="resource-money">0</span></div>
     </div>
     <canvas id="minimap-canvas" class="minimap" width="150" height="150"></canvas>
+    <div id="touch-joystick" class="touch-joystick hidden">
+      <div id="touch-joystick-knob" class="touch-joystick-knob"></div>
+    </div>
     <div id="shop-panel" class="shop-panel hidden">
       <h3>お店</h3>
       <p>木材: <span id="shop-wood">0</span> ／ お金: <span id="shop-money">0</span></p>
@@ -31,19 +46,13 @@
       </div>
       <button type="button" id="shop-close">閉じる</button>
     </div>
-    <div id="debug-panel" class="debug-panel">
+    <div id="player-panel" class="debug-panel">
       <div class="debug-stats">
         <div>時刻: <span id="stat-time">06:00</span></div>
         <div class="sleepiness-row">
           眠気:
           <span id="sleepiness-bar" class="sleepiness-bar"><span id="sleepiness-bar-fill"></span></span>
         </div>
-        <div>チャンク数: <span id="stat-chunks">0</span></div>
-        <div>タイル数: <span id="stat-tiles">0</span></div>
-        <div>建物数: <span id="stat-buildings">0</span></div>
-        <div>木の数: <span id="stat-trees">0</span></div>
-        <div>FPS: <span id="stat-fps">--</span></div>
-        <div>インスタンス数: <span id="stat-instances">0</span></div>
       </div>
       <label class="debug-seed">
         シード
@@ -59,6 +68,17 @@
         <button type="button" id="reset-button">リセット</button>
         <button type="button" id="mute-button">🔊</button>
       </div>
+    </div>
+    <div id="debug-info-panel" class="debug-panel debug-info-panel hidden">
+      <div class="debug-stats">
+        <div>チャンク数: <span id="stat-chunks">0</span></div>
+        <div>タイル数: <span id="stat-tiles">0</span></div>
+        <div>建物数: <span id="stat-buildings">0</span></div>
+        <div>木の数: <span id="stat-trees">0</span></div>
+        <div>FPS: <span id="stat-fps">--</span></div>
+        <div>インスタンス数: <span id="stat-instances">0</span></div>
+      </div>
+      <div class="debug-info-hint">F3で閉じる</div>
     </div>
     <div id="build-menu" class="build-menu hidden">
       <div class="build-menu-tabs">

@@ -1,3 +1,5 @@
+import { BUILD_COSTS } from './economy.js';
+
 const menuEl = document.getElementById('build-menu');
 const tabButtons = menuEl.querySelectorAll('.tab-button');
 const panels = menuEl.querySelectorAll('.build-menu-panel');
@@ -12,6 +14,15 @@ function handleButtonClick(event) {
 
 menuEl.querySelectorAll('button[data-type]').forEach((btn) => {
   btn.addEventListener('click', handleButtonClick);
+
+  // 必要な木材・お金をボタンに常時表示しておく（コストが設定されている種類のみ）。
+  const cost = BUILD_COSTS[btn.dataset.type];
+  if (cost) {
+    const costLabel = document.createElement('span');
+    costLabel.className = 'cost-label';
+    costLabel.textContent = `🪵${cost.wood} 💰${cost.money}`;
+    btn.appendChild(costLabel);
+  }
 });
 
 function showTab(tabName) {
@@ -51,14 +62,20 @@ export function isBuildMenuOpen() {
 }
 
 /**
- * まだ解放されていない種類のボタンをグレーアウトして選べないようにする
- * （フェーズ19：評判スコアによる建築物のアンロック）。
+ * 各ボタンの見た目を最新の状態に合わせる：
+ * - まだ解放されていない種類（フェーズ19：評判スコアによるアンロック）
+ * - 木材・お金が足りず選べない種類
+ * のどちらかに該当するボタンをグレーアウトして選べないようにする。
  */
-export function updateLockedButtons(lockedTypes) {
+export function updateButtonStates({ lockedTypes = [], wood = 0, money = 0 } = {}) {
   const lockedSet = new Set(lockedTypes);
   menuEl.querySelectorAll('button[data-type]').forEach((btn) => {
-    const locked = lockedSet.has(btn.dataset.type);
-    btn.disabled = locked;
+    const type = btn.dataset.type;
+    const locked = lockedSet.has(type);
+    const cost = BUILD_COSTS[type];
+    const unaffordable = !locked && !!cost && (wood < cost.wood || money < cost.money);
+    btn.disabled = locked || unaffordable;
     btn.classList.toggle('locked', locked);
+    btn.classList.toggle('unaffordable', unaffordable);
   });
 }

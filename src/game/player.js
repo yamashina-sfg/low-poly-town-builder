@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createCharacter } from '../character.js';
 import { playFootstep } from '../ambientAudio.js';
+import { getTouchMoveVector } from './touchControls.js';
 
 const MOVE_SPEED = 5; // units / sec
 const TURN_SMOOTHING = 10; // 大きいほど素早く向きを変える
@@ -91,7 +92,13 @@ export function updateMovementInput(delta) {
   if (isPressed('KeyA', 'ArrowLeft')) moveDirection.x -= 1;
   if (isPressed('KeyD', 'ArrowRight')) moveDirection.x += 1;
 
-  const isMoving = moveDirection.lengthSq() > 0;
+  // タッチデバイスの仮想スティック入力をキーボードに合成する
+  // （キーボード入力がなければそのまま仮想スティックの向きが使われる）。
+  const touch = getTouchMoveVector();
+  moveDirection.x += touch.x;
+  moveDirection.z += touch.z;
+
+  const isMoving = moveDirection.lengthSq() > 0.0001;
   if (isMoving) {
     moveDirection.normalize();
     character.position.addScaledVector(moveDirection, MOVE_SPEED * delta);

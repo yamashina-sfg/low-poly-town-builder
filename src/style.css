@@ -254,6 +254,20 @@ canvas {
   background: #ffffff;
 }
 
+.debug-info-panel {
+  top: 8px;
+  left: 178px;
+}
+
+.debug-info-panel.hidden {
+  display: none;
+}
+
+.debug-info-hint {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
 .build-menu {
   position: fixed;
   z-index: 10;
@@ -320,14 +334,29 @@ canvas {
   background: #ffffff;
 }
 
-.build-menu button[data-type].locked {
+.build-menu button[data-type].locked,
+.build-menu button[data-type].unaffordable {
   background: rgba(255, 255, 255, 0.35);
   color: rgba(34, 51, 34, 0.6);
   cursor: not-allowed;
 }
 
-.build-menu button[data-type].locked:hover {
+.build-menu button[data-type].locked:hover,
+.build-menu button[data-type].unaffordable:hover {
   background: rgba(255, 255, 255, 0.35);
+}
+
+.build-menu button[data-type] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.build-menu .cost-label {
+  font-size: 11px;
+  opacity: 0.75;
+  white-space: nowrap;
 }
 
 .reputation-panel {
@@ -348,4 +377,84 @@ canvas {
 #reputation-score {
   font-family: monospace;
   opacity: 0.85;
+}
+
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.onboarding-overlay.hidden {
+  display: none;
+}
+
+.onboarding-card {
+  max-width: 360px;
+  padding: 24px 28px;
+  background: rgba(30, 40, 30, 0.97);
+  color: #fff;
+  font-family: system-ui, sans-serif;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.onboarding-card h2 {
+  margin-top: 0;
+  font-size: 18px;
+}
+
+.onboarding-card ul {
+  padding-left: 20px;
+  line-height: 1.8;
+}
+
+.onboarding-card button {
+  width: 100%;
+  padding: 10px;
+  margin-top: 8px;
+  border: none;
+  border-radius: 8px;
+  background: #6fae5c;
+  color: #fff;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.onboarding-card button:hover {
+  background: #7fc06c;
+}
+
+.touch-joystick {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  z-index: 10;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  touch-action: none;
+}
+
+.touch-joystick.hidden {
+  display: none;
+}
+
+.touch-joystick-knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+  pointer-events: none;
 }
