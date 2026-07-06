@@ -23,7 +23,15 @@ import {
 import { generateRoad, computeRoadConnections } from './road.js';
 import { generateWater, updateWaterTime } from './water.js';
 import { getAllPoolMeshes, removeInstance, getInstanceCount, updateInstanceAnimations } from './instancing.js';
-import { initDebugPanel, updateDebugStats, setSeedInputValue, setMuteButtonLabel } from './debugPanel.js';
+import {
+  initDebugPanel,
+  updateDebugStats,
+  setSeedInputValue,
+  setMuteButtonLabel,
+  updateTimeAndSleepiness,
+} from './debugPanel.js';
+import { advanceGameTime, getGameTime, formatGameTime, skipTimeToMorning } from './gameTime.js';
+import { advanceSleepiness, resetSleepiness, getSleepiness } from './playerStatus.js';
 import { saveTownToLocalStorage, loadTownFromLocalStorage } from './save.js';
 import { createCharacter } from './character.js';
 import { updateDayNightCycle } from './dayNightCycle.js';
@@ -95,6 +103,20 @@ const PROCEDURAL_GENERATORS = {
 
 const BUILDING_TYPES = new Set(['house', 'shop', 'well', 'warehouse']);
 const FURNITURE_TYPES = new Set(['bed', 'table', 'chair', 'fireplace']);
+
+// ベッドが置かれているタイル（屋内外どちらも）を追跡し、
+// キャラが近づいたときに「眠る」操作を出せるようにする。
+const bedTiles = new Set();
+// タイル間隔(TILE_SIZE=2)より広く取り、隣のタイルに置いたベッドにも反応するようにする
+const SLEEP_RANGE = 2.5;
+
+function trackBedTile(tile, type) {
+  if (type === 'bed') {
+    bedTiles.add(tile);
+  } else {
+    bedTiles.delete(tile);
+  }
+}
 
 // ------------------------------------------------------------------
 // 建物の内部（住居のみ）：シンプルな1部屋の室内シーン
@@ -264,6 +286,8 @@ function buildOnTile(tile, type, { animate = true } = {}) {
     tile.userData.object = generateRoad(tile.position, connections, { animate });
   }
 
+  trackBedTile(tile, type);
+
   // このタイルの変化で隣接する道路タイルの接続形状が変わるかもしれないため更新する
   getNeighborTiles(tile).forEach(refreshRoadTile);
 }
@@ -275,6 +299,7 @@ function rebuildIndoorFurniture(houseTile) {
   const layout = houseTile.userData.indoorFurniture;
   indoorTiles.forEach((indoorTile) => {
     clearTileObject(indoorTile);
+    trackBedTile(indoorTile, null);
     const type = layout[indoorTile.userData.localIndex];
     const generatorEntry = type ? PROCEDURAL_GENERATORS[type] : null;
     if (generatorEntry) {
@@ -285,6 +310,7 @@ function rebuildIndoorFurniture(houseTile) {
       );
       indoorTile.userData.tileType = type;
       indoorTile.userData.object = generatorEntry.generate(seed, indoorTile.position, { animate: false });
+      trackBedTile(indoorTile, type);
     } else {
       indoorTile.userData.tileType = 'grass';
     }
@@ -314,6 +340,7 @@ function buildOnIndoorTile(indoorTile, type) {
   } else {
     indoorTile.userData.tileType = 'grass';
   }
+  trackBedTile(indoorTile, type === 'clear' ? null : type);
 }
 
 /**
@@ -359,6 +386,17 @@ function exitHouse() {
 
   hideBuildMenu();
   document.getElementById('exit-building-button').classList.add('hidden');
+}
+
+let nearBed = false;
+
+/**
+ * ベッドに近づいて眠る：時間を朝まで進め、眠気をリセットする。
+ */
+function sleep() {
+  if (!nearBed) return;
+  skipTimeToMorning();
+  resetSleepiness();
 }
 
 function getTownStats() {
@@ -484,8 +522,10 @@ renderer.domElement.addEventListener('click', (event) => {
 });
 
 document.getElementById('exit-building-button').addEventListener('click', exitHouse);
+document.getElementById('sleep-prompt').addEventListener('click', sleep);
 window.addEventListener('keydown', (event) => {
   if (event.code === 'Escape' && indoorMode) exitHouse();
+  if (event.code === 'KeyE') sleep();
 });
 
 // ------------------------------------------------------------------
@@ -507,7 +547,22 @@ function animate() {
 
   updateWaterTime(clock.elapsedTime);
   updateInstanceAnimations(clock.elapsedTime);
-  updateDayNightCycle({ elapsed: clock.elapsedTime, scene, dirLight, hemiLight });
+
+  advanceGameTime(delta);
+  advanceSleepiness(delta);
+  const { dayFraction } = getGameTime();
+  updateDayNightCycle({ dayFraction, scene, dirLight, hemiLight });
+
+  // ベッドに近づいたら「眠る」プロンプトを表示する
+  let nearestBedDistance = Infinity;
+  bedTiles.forEach((bedTile) => {
+    nearestBedDistance = Math.min(nearestBedDistance, character.position.distanceTo(bedTile.position));
+  });
+  const wasNearBed = nearBed;
+  nearBed = nearestBedDistance <= SLEEP_RANGE;
+  if (nearBed !== wasNearBed) {
+    document.getElementById('sleep-prompt').classList.toggle('hidden', !nearBed);
+  }
 
   fpsFrameCount += 1;
   fpsElapsed += delta;
@@ -522,6 +577,7 @@ function animate() {
       fps,
       instanceCount: getInstanceCount(),
     });
+    updateTimeAndSleepiness(formatGameTime(), Math.round(getSleepiness()));
     fpsFrameCount = 0;
     fpsElapsed = 0;
   }

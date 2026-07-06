@@ -1,3 +1,5 @@
+const timeEl = document.getElementById('stat-time');
+const sleepinessFillEl = document.getElementById('sleepiness-bar-fill');
 const chunksEl = document.getElementById('stat-chunks');
 const tilesEl = document.getElementById('stat-tiles');
 const buildingsEl = document.getElementById('stat-buildings');
@@ -51,4 +53,11 @@ export function updateDebugStats({ tileCount, buildingCount, treeCount, chunkCou
 
 export function setSeedInputValue(seed) {
   seedInput.value = seed;
+}
+
+export function updateTimeAndSleepiness(timeText, sleepinessPercent) {
+  timeEl.textContent = timeText;
+  sleepinessFillEl.style.width = `${sleepinessPercent}%`;
+  const color = sleepinessPercent > 70 ? '#c9564c' : sleepinessPercent > 40 ? '#c9a227' : '#6fae5c';
+  sleepinessFillEl.style.backgroundColor = color;
 }

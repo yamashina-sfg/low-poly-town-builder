@@ -9,8 +9,14 @@
   <body>
     <div id="app"></div>
     <button type="button" id="exit-building-button" class="exit-building-button hidden">外に出る (Esc)</button>
+    <button type="button" id="sleep-prompt" class="sleep-prompt hidden">Eキーで眠る</button>
     <div id="debug-panel" class="debug-panel">
       <div class="debug-stats">
+        <div>時刻: <span id="stat-time">06:00</span></div>
+        <div class="sleepiness-row">
+          眠気:
+          <span id="sleepiness-bar" class="sleepiness-bar"><span id="sleepiness-bar-fill"></span></span>
+        </div>
         <div>チャンク数: <span id="stat-chunks">0</span></div>
         <div>タイル数: <span id="stat-tiles">0</span></div>
         <div>建物数: <span id="stat-buildings">0</span></div>
