@@ -253,8 +253,12 @@ const isPressed = (...codes) => codes.some((code) => keys[code]);
 // ------------------------------------------------------------------
 // カメラ（三人称・キャラ追従）
 // ------------------------------------------------------------------
-const CAMERA_OFFSET = new THREE.Vector3(0, 4.5, 7);
-const INDOOR_CAMERA_OFFSET = new THREE.Vector3(0, 2.4, 3.2);
+// Z成分は負（キャラの進行方向=forwardの逆側）にすることで、
+// カメラが常にキャラの「後方」に位置するようにする。
+// （+forward*dist は前方に回り込んでしまい、前進するとキャラがカメラに
+// 近づいて見える不具合の原因だった）
+const CAMERA_OFFSET = new THREE.Vector3(0, 4.5, -7);
+const INDOOR_CAMERA_OFFSET = new THREE.Vector3(0, 2.4, -3.2);
 const cameraCurrentPosition = new THREE.Vector3()
   .copy(character.position)
   .add(CAMERA_OFFSET);
