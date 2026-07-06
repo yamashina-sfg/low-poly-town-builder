@@ -8,7 +8,9 @@ import {
   forEachLoadedTile,
   updateChunkVisibility,
   getVisibleTileMeshes,
+  worldToGlobalTileCoords,
 } from './chunkManager.js';
+import { resolveCollisionAgainstTiles, pushEntitiesApart } from './collision.js';
 import { showBuildMenu, hideBuildMenu } from './buildMenu.js';
 import { generateBuilding, generateTree } from './generators.js';
 import { generateShop, generateWell, generateWarehouse } from './buildingVariants.js';
@@ -151,6 +153,33 @@ function findNearestTile(tileSet) {
     }
   });
   return { tile: nearest, distance: nearestDistance };
+}
+
+// ------------------------------------------------------------------
+// 衝突判定：建物・木・水・家具などにぶつかって歩けないようにする
+// ------------------------------------------------------------------
+const PLAYER_COLLISION_RADIUS = 0.35;
+const NPC_COLLISION_RADIUS = 0.35;
+const DOG_COLLISION_RADIUS = 0.22;
+
+/**
+ * ワールド座標(x, z)周辺3x3タイル分をグローバルタイル座標から直接引く。
+ * チャンク数に関係なく常に高々9回のルックアップで済む
+ * （全タイルを舐めるO(n)処理を避けるため）。
+ */
+function getNearbyOutdoorTiles(x, z) {
+  const { gx, gy } = worldToGlobalTileCoords(x, z);
+  const tiles = [];
+  for (let dy = -1; dy <= 1; dy += 1) {
+    for (let dx = -1; dx <= 1; dx += 1) {
+      tiles.push(getGlobalTile(gx + dx, gy + dy));
+    }
+  }
+  return tiles;
+}
+
+function resolveOutdoorCollision(position, radius) {
+  resolveCollisionAgainstTiles(position, radius, getNearbyOutdoorTiles(position.x, position.z));
 }
 
 // ------------------------------------------------------------------
@@ -847,6 +876,10 @@ function animate() {
   dogs.forEach((dog) => dog.update(delta));
   birds.forEach((bird) => bird.update(clock.elapsedTime));
 
+  // NPC・犬も建物や木にぶつかって歩けないようにする（屋外専用、常に屋外にいる）
+  npcs.forEach((npc) => resolveOutdoorCollision(npc.group.position, NPC_COLLISION_RADIUS));
+  dogs.forEach((dog) => resolveOutdoorCollision(dog.group.position, DOG_COLLISION_RADIUS));
+
   if (indoorMode) {
     // 室内では部屋の範囲内にキャラを収める（チャンクの生成・可視化更新は行わない）
     const roomHalf = ROOM_SIZE / 2 - 0.4;
@@ -860,17 +893,36 @@ function animate() {
       INTERIOR_OFFSET.z - roomHalf,
       INTERIOR_OFFSET.z + roomHalf
     );
-  } else if (isMoving) {
-    // キャラが今いるチャンクが変わったら、周囲3x3チャンクの生成漏れを埋め、
-    // 遠くのチャンクは非表示にして描画をスキップする
-    const currentChunk = ensureChunksAround(
-      character.position.x,
-      character.position.z,
-      { scene, worldSeed, onProceduralTile: handleProceduralTile }
-    );
-    if (currentChunk.cx !== lastCharacterChunk.cx || currentChunk.cy !== lastCharacterChunk.cy) {
-      updateChunkVisibility(character.position.x, character.position.z);
-      lastCharacterChunk = currentChunk;
+    resolveCollisionAgainstTiles(character.position, PLAYER_COLLISION_RADIUS, indoorTiles);
+  } else {
+    resolveOutdoorCollision(character.position, PLAYER_COLLISION_RADIUS);
+
+    if (isMoving) {
+      // キャラが今いるチャンクが変わったら、周囲3x3チャンクの生成漏れを埋め、
+      // 遠くのチャンクは非表示にして描画をスキップする
+      const currentChunk = ensureChunksAround(
+        character.position.x,
+        character.position.z,
+        { scene, worldSeed, onProceduralTile: handleProceduralTile }
+      );
+      if (currentChunk.cx !== lastCharacterChunk.cx || currentChunk.cy !== lastCharacterChunk.cy) {
+        updateChunkVisibility(character.position.x, character.position.z);
+        lastCharacterChunk = currentChunk;
+      }
+    }
+
+    // プレイヤー・NPC・犬同士がすり抜けないよう、ゆるく押し出し合う
+    const creatures = [
+      ...npcs.map((npc) => ({ position: npc.group.position, radius: NPC_COLLISION_RADIUS })),
+      ...dogs.map((dog) => ({ position: dog.group.position, radius: DOG_COLLISION_RADIUS })),
+    ];
+    creatures.forEach((creature) => {
+      pushEntitiesApart(character.position, PLAYER_COLLISION_RADIUS, creature.position, creature.radius);
+    });
+    for (let i = 0; i < creatures.length; i += 1) {
+      for (let j = i + 1; j < creatures.length; j += 1) {
+        pushEntitiesApart(creatures[i].position, creatures[i].radius, creatures[j].position, creatures[j].radius);
+      }
     }
   }
 
