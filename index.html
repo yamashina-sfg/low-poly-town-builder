@@ -9,7 +9,21 @@
   <body>
     <div id="app"></div>
     <button type="button" id="exit-building-button" class="exit-building-button hidden">外に出る (Esc)</button>
-    <button type="button" id="sleep-prompt" class="sleep-prompt hidden">Eキーで眠る</button>
+    <button type="button" id="action-prompt" class="action-prompt hidden">Eキーで眠る</button>
+    <div id="status-message" class="status-message hidden"></div>
+    <div id="resource-panel" class="resource-panel">
+      <div>🪵 <span id="resource-wood">0</span></div>
+      <div>💰 <span id="resource-money">0</span></div>
+    </div>
+    <div id="shop-panel" class="shop-panel hidden">
+      <h3>お店</h3>
+      <p>木材: <span id="shop-wood">0</span> ／ お金: <span id="shop-money">0</span></p>
+      <div class="shop-buttons">
+        <button type="button" id="shop-sell-wood">木材10を売る (+15円)</button>
+        <button type="button" id="shop-buy-wood">木材10を買う (-20円)</button>
+      </div>
+      <button type="button" id="shop-close">閉じる</button>
+    </div>
     <div id="debug-panel" class="debug-panel">
       <div class="debug-stats">
         <div>時刻: <span id="stat-time">06:00</span></div>

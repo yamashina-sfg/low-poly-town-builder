@@ -32,6 +32,7 @@ import {
 } from './debugPanel.js';
 import { advanceGameTime, getGameTime, formatGameTime, skipTimeToMorning } from './gameTime.js';
 import { advanceSleepiness, resetSleepiness, getSleepiness } from './playerStatus.js';
+import { getWood, getMoney, canAfford, pay, addWood, trySpendMoney, trySpendWood, addMoney } from './economy.js';
 import { saveTownToLocalStorage, loadTownFromLocalStorage } from './save.js';
 import { createCharacter } from './character.js';
 import { updateDayNightCycle } from './dayNightCycle.js';
@@ -104,18 +105,34 @@ const PROCEDURAL_GENERATORS = {
 const BUILDING_TYPES = new Set(['house', 'shop', 'well', 'warehouse']);
 const FURNITURE_TYPES = new Set(['bed', 'table', 'chair', 'fireplace']);
 
-// ベッドが置かれているタイル（屋内外どちらも）を追跡し、
-// キャラが近づいたときに「眠る」操作を出せるようにする。
+// ベッド・木・お店が置かれているタイル（屋内外どちらも）を追跡し、
+// キャラが近づいたときに「眠る/伐採する/お店を開く」操作を出せるようにする。
 const bedTiles = new Set();
-// タイル間隔(TILE_SIZE=2)より広く取り、隣のタイルに置いたベッドにも反応するようにする
-const SLEEP_RANGE = 2.5;
+const treeTiles = new Set();
+const shopTiles = new Set();
+// タイル間隔(TILE_SIZE=2)より広く取り、隣のタイルに置いたものにも反応するようにする
+const INTERACTION_RANGE = 2.5;
 
-function trackBedTile(tile, type) {
-  if (type === 'bed') {
-    bedTiles.add(tile);
-  } else {
-    bedTiles.delete(tile);
-  }
+function trackInteractiveTile(tile, type) {
+  bedTiles.delete(tile);
+  treeTiles.delete(tile);
+  shopTiles.delete(tile);
+  if (type === 'bed') bedTiles.add(tile);
+  else if (type === 'tree') treeTiles.add(tile);
+  else if (type === 'shop') shopTiles.add(tile);
+}
+
+function findNearestTile(tileSet) {
+  let nearest = null;
+  let nearestDistance = Infinity;
+  tileSet.forEach((tile) => {
+    const distance = character.position.distanceTo(tile.position);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearest = tile;
+    }
+  });
+  return { tile: nearest, distance: nearestDistance };
 }
 
 // ------------------------------------------------------------------
@@ -286,7 +303,7 @@ function buildOnTile(tile, type, { animate = true } = {}) {
     tile.userData.object = generateRoad(tile.position, connections, { animate });
   }
 
-  trackBedTile(tile, type);
+  trackInteractiveTile(tile, type);
 
   // このタイルの変化で隣接する道路タイルの接続形状が変わるかもしれないため更新する
   getNeighborTiles(tile).forEach(refreshRoadTile);
@@ -299,7 +316,7 @@ function rebuildIndoorFurniture(houseTile) {
   const layout = houseTile.userData.indoorFurniture;
   indoorTiles.forEach((indoorTile) => {
     clearTileObject(indoorTile);
-    trackBedTile(indoorTile, null);
+    trackInteractiveTile(indoorTile, null);
     const type = layout[indoorTile.userData.localIndex];
     const generatorEntry = type ? PROCEDURAL_GENERATORS[type] : null;
     if (generatorEntry) {
@@ -310,7 +327,7 @@ function rebuildIndoorFurniture(houseTile) {
       );
       indoorTile.userData.tileType = type;
       indoorTile.userData.object = generatorEntry.generate(seed, indoorTile.position, { animate: false });
-      trackBedTile(indoorTile, type);
+      trackInteractiveTile(indoorTile, type);
     } else {
       indoorTile.userData.tileType = 'grass';
     }
@@ -340,7 +357,7 @@ function buildOnIndoorTile(indoorTile, type) {
   } else {
     indoorTile.userData.tileType = 'grass';
   }
-  trackBedTile(indoorTile, type === 'clear' ? null : type);
+  trackInteractiveTile(indoorTile, type === 'clear' ? null : type);
 }
 
 /**
@@ -388,15 +405,72 @@ function exitHouse() {
   document.getElementById('exit-building-button').classList.add('hidden');
 }
 
-let nearBed = false;
+// 現在キャラが操作できる対象（ベッド/木/お店のうち最も近いもの）
+let interactionTarget = null;
+
+const ACTION_PROMPT_LABELS = {
+  bed: 'Eキーで眠る',
+  tree: 'Eキーで伐採する',
+  shop: 'Eキーでお店を開く',
+};
+
+function updateActionPrompt() {
+  const promptEl = document.getElementById('action-prompt');
+  if (interactionTarget) {
+    promptEl.textContent = ACTION_PROMPT_LABELS[interactionTarget.type];
+    promptEl.classList.remove('hidden');
+  } else {
+    promptEl.classList.add('hidden');
+  }
+}
+
+function showStatusMessage(text) {
+  const el = document.getElementById('status-message');
+  el.textContent = text;
+  el.classList.remove('hidden');
+  clearTimeout(showStatusMessage.timeoutId);
+  showStatusMessage.timeoutId = setTimeout(() => el.classList.add('hidden'), 2000);
+}
 
 /**
  * ベッドに近づいて眠る：時間を朝まで進め、眠気をリセットする。
  */
 function sleep() {
-  if (!nearBed) return;
   skipTimeToMorning();
   resetSleepiness();
+  showStatusMessage('ぐっすり眠った。朝になった。');
+}
+
+/**
+ * 木に近づいて伐採する：木材を入手し、タイルを更地に戻す。
+ */
+function chopTree(tile) {
+  const amount = 3 + Math.floor(Math.random() * 4);
+  addWood(amount);
+  buildOnTile(tile, 'clear');
+  showStatusMessage(`木材を${amount}個手に入れた`);
+}
+
+function updateResourcePanel() {
+  document.getElementById('resource-wood').textContent = getWood();
+  document.getElementById('resource-money').textContent = getMoney();
+}
+
+function openShop() {
+  document.getElementById('shop-wood').textContent = getWood();
+  document.getElementById('shop-money').textContent = getMoney();
+  document.getElementById('shop-panel').classList.remove('hidden');
+}
+
+function closeShop() {
+  document.getElementById('shop-panel').classList.add('hidden');
+}
+
+function handleActionKey() {
+  if (!interactionTarget) return;
+  if (interactionTarget.type === 'bed') sleep();
+  else if (interactionTarget.type === 'tree') chopTree(interactionTarget.tile);
+  else if (interactionTarget.type === 'shop') openShop();
 }
 
 function getTownStats() {
@@ -513,6 +587,13 @@ renderer.domElement.addEventListener('click', (event) => {
   }
 
   showBuildMenu(event.clientX, event.clientY, (type) => {
+    if (!canAfford(type)) {
+      showStatusMessage('木材またはお金が足りない');
+      return;
+    }
+    pay(type);
+    updateResourcePanel();
+
     if (indoorMode) {
       buildOnIndoorTile(tile, type);
     } else {
@@ -522,10 +603,30 @@ renderer.domElement.addEventListener('click', (event) => {
 });
 
 document.getElementById('exit-building-button').addEventListener('click', exitHouse);
-document.getElementById('sleep-prompt').addEventListener('click', sleep);
+document.getElementById('action-prompt').addEventListener('click', handleActionKey);
 window.addEventListener('keydown', (event) => {
   if (event.code === 'Escape' && indoorMode) exitHouse();
-  if (event.code === 'KeyE') sleep();
+  if (event.code === 'KeyE') handleActionKey();
+});
+
+document.getElementById('shop-close').addEventListener('click', closeShop);
+document.getElementById('shop-sell-wood').addEventListener('click', () => {
+  if (trySpendWood(10)) {
+    addMoney(15);
+    showStatusMessage('木材10を売って15円手に入れた');
+  } else {
+    showStatusMessage('木材が足りない');
+  }
+  openShop();
+});
+document.getElementById('shop-buy-wood').addEventListener('click', () => {
+  if (trySpendMoney(20)) {
+    addWood(10);
+    showStatusMessage('木材10を買った');
+  } else {
+    showStatusMessage('お金が足りない');
+  }
+  openShop();
 });
 
 // ------------------------------------------------------------------
@@ -553,15 +654,19 @@ function animate() {
   const { dayFraction } = getGameTime();
   updateDayNightCycle({ dayFraction, scene, dirLight, hemiLight });
 
-  // ベッドに近づいたら「眠る」プロンプトを表示する
-  let nearestBedDistance = Infinity;
-  bedTiles.forEach((bedTile) => {
-    nearestBedDistance = Math.min(nearestBedDistance, character.position.distanceTo(bedTile.position));
-  });
-  const wasNearBed = nearBed;
-  nearBed = nearestBedDistance <= SLEEP_RANGE;
-  if (nearBed !== wasNearBed) {
-    document.getElementById('sleep-prompt').classList.toggle('hidden', !nearBed);
+  // ベッド・木・お店のうち最も近いものを操作対象にする（優先度: ベッド＞木＞お店）
+  const bedNear = findNearestTile(bedTiles);
+  const treeNear = findNearestTile(treeTiles);
+  const shopNear = findNearestTile(shopTiles);
+
+  let newTarget = null;
+  if (bedNear.distance <= INTERACTION_RANGE) newTarget = { type: 'bed', tile: bedNear.tile };
+  else if (treeNear.distance <= INTERACTION_RANGE) newTarget = { type: 'tree', tile: treeNear.tile };
+  else if (shopNear.distance <= INTERACTION_RANGE) newTarget = { type: 'shop', tile: shopNear.tile };
+
+  if (newTarget?.type !== interactionTarget?.type || newTarget?.tile !== interactionTarget?.tile) {
+    interactionTarget = newTarget;
+    updateActionPrompt();
   }
 
   fpsFrameCount += 1;
@@ -578,6 +683,7 @@ function animate() {
       instanceCount: getInstanceCount(),
     });
     updateTimeAndSleepiness(formatGameTime(), Math.round(getSleepiness()));
+    updateResourcePanel();
     fpsFrameCount = 0;
     fpsElapsed = 0;
   }
@@ -651,4 +757,5 @@ function animate() {
   requestAnimationFrame(animate);
 }
 
+updateResourcePanel();
 requestAnimationFrame(animate);

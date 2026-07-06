@@ -36,7 +36,7 @@ canvas {
   display: none;
 }
 
-.sleep-prompt {
+.action-prompt {
   position: fixed;
   bottom: 76px;
   left: 50%;
@@ -52,8 +52,87 @@ canvas {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
-.sleep-prompt.hidden {
+.action-prompt.hidden {
   display: none;
+}
+
+.status-message {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 11;
+  padding: 8px 18px;
+  border-radius: 8px;
+  background: rgba(20, 20, 20, 0.85);
+  color: #fff;
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.status-message.hidden {
+  display: none;
+}
+
+.resource-panel {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  display: flex;
+  gap: 14px;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-family: monospace;
+  font-size: 15px;
+  border-radius: 6px;
+}
+
+.shop-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 24px;
+  background: rgba(30, 30, 40, 0.95);
+  color: #fff;
+  font-family: system-ui, sans-serif;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  min-width: 260px;
+}
+
+.shop-panel.hidden {
+  display: none;
+}
+
+.shop-panel h3 {
+  margin: 0;
+}
+
+.shop-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.shop-panel button {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #223322;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.shop-panel button:hover {
+  background: #ffffff;
 }
 
 .sleepiness-row {
