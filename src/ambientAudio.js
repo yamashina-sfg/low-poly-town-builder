@@ -80,6 +80,32 @@ export function startAmbientAudio() {
   scheduleBirdChirp();
 }
 
+/**
+ * 短いノイズバーストで足音を1回鳴らす。歩行アニメーションの周期に合わせて呼ぶ。
+ */
+export function playFootstep() {
+  if (!started || !audioContext) return;
+  const ctx = audioContext;
+  const now = ctx.currentTime;
+
+  const noise = ctx.createBufferSource();
+  noise.buffer = createNoiseBuffer(ctx, 0.1);
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 250;
+
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.1, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+  noise.connect(filter);
+  filter.connect(gain);
+  gain.connect(masterGain);
+  noise.start(now);
+  noise.stop(now + 0.1);
+}
+
 export function setAmbientMuted(muted) {
   if (!masterGain) return;
   masterGain.gain.value = muted ? 0 : 0.5;

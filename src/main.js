@@ -38,7 +38,9 @@ import { createCharacter } from './character.js';
 import { createNPC } from './npc.js';
 import { createBird, createDog } from './creatures.js';
 import { updateDayNightCycle } from './dayNightCycle.js';
-import { startAmbientAudio, setAmbientMuted } from './ambientAudio.js';
+import { startAmbientAudio, setAmbientMuted, playFootstep } from './ambientAudio.js';
+import { spawnParticleBurst, spawnSparkle, updateParticles } from './particles.js';
+import { initMinimap, updateMinimap } from './minimap.js';
 import {
   initInteriorRoom,
   getIndoorTiles,
@@ -112,6 +114,8 @@ const FURNITURE_TYPES = new Set(['bed', 'table', 'chair', 'fireplace']);
 const bedTiles = new Set();
 const treeTiles = new Set();
 const shopTiles = new Set();
+// 水面のきらめきパーティクルをたまに出すための水タイル一覧
+const waterTiles = new Set();
 // タイル間隔(TILE_SIZE=2)より広く取り、隣のタイルに置いたものにも反応するようにする
 const INTERACTION_RANGE = 2.5;
 
@@ -119,9 +123,11 @@ function trackInteractiveTile(tile, type) {
   bedTiles.delete(tile);
   treeTiles.delete(tile);
   shopTiles.delete(tile);
+  waterTiles.delete(tile);
   if (type === 'bed') bedTiles.add(tile);
   else if (type === 'tree') treeTiles.add(tile);
   else if (type === 'shop') shopTiles.add(tile);
+  else if (type === 'water') waterTiles.add(tile);
 }
 
 function findNearestTile(tileSet) {
@@ -141,6 +147,7 @@ function findNearestTile(tileSet) {
 // 建物の内部（住居のみ）：シンプルな1部屋の室内シーン
 // ------------------------------------------------------------------
 initInteriorRoom(scene);
+initMinimap();
 const indoorTiles = getIndoorTiles();
 let indoorMode = false;
 let enteredHouseTile = null;
@@ -496,6 +503,16 @@ function sleep() {
 function chopTree(tile) {
   const amount = 3 + Math.floor(Math.random() * 4);
   addWood(amount);
+  const leafPosition = tile.position.clone().add(new THREE.Vector3(0, 0.9, 0));
+  spawnParticleBurst(scene, {
+    position: leafPosition,
+    count: 10,
+    color: 0x6b8e3d,
+    size: 0.1,
+    speed: 2.2,
+    life: 1,
+    gravity: -3,
+  });
   buildOnTile(tile, 'clear');
   showStatusMessage(`木材を${amount}個手に入れた`);
 }
@@ -691,9 +708,14 @@ const desiredCameraPosition = new THREE.Vector3();
 
 let fpsFrameCount = 0;
 let fpsElapsed = 0;
+let footstepTimer = 0;
+let sparkleTimer = 0;
+let minimapTimer = 0;
 
 function animate() {
   const delta = Math.min(clock.getDelta(), 0.1);
+
+  updateParticles(delta);
 
   updateWaterTime(clock.elapsedTime);
   updateInstanceAnimations(clock.elapsedTime);
@@ -758,6 +780,39 @@ function animate() {
     character.rotation.y = characterFacing;
   }
   characterController.updateWalkAnimation(isMoving, delta);
+
+  // 歩いている間、一定間隔で足音を鳴らす
+  if (isMoving) {
+    footstepTimer += delta;
+    if (footstepTimer >= 0.35) {
+      playFootstep();
+      footstepTimer = 0;
+    }
+  } else {
+    footstepTimer = 0;
+  }
+
+  // 水タイルにときどききらめきパーティクルを出す
+  sparkleTimer += delta;
+  if (sparkleTimer >= 0.4 && waterTiles.size > 0) {
+    sparkleTimer = 0;
+    const index = Math.floor(Math.random() * waterTiles.size);
+    let i = 0;
+    for (const waterTile of waterTiles) {
+      if (i === index) {
+        spawnSparkle(scene, waterTile.position.clone().add(new THREE.Vector3(0, 0.1, 0)));
+        break;
+      }
+      i += 1;
+    }
+  }
+
+  // ミニマップは毎フレームではなく間引いて更新する
+  minimapTimer += delta;
+  if (minimapTimer >= 0.15) {
+    minimapTimer = 0;
+    updateMinimap({ characterPosition: character.position, characterFacing, forEachLoadedTile });
+  }
 
   npcs.forEach((npc) => npc.update(delta));
   dogs.forEach((dog) => dog.update(delta));
