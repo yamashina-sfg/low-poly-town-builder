@@ -1,4 +1,6 @@
 const menuEl = document.getElementById('build-menu');
+const tabButtons = menuEl.querySelectorAll('.tab-button');
+const panels = menuEl.querySelectorAll('.build-menu-panel');
 
 let onSelect = null;
 
@@ -12,6 +14,15 @@ menuEl.querySelectorAll('button[data-type]').forEach((btn) => {
   btn.addEventListener('click', handleButtonClick);
 });
 
+function showTab(tabName) {
+  tabButtons.forEach((btn) => btn.classList.toggle('active', btn.dataset.tab === tabName));
+  panels.forEach((panel) => panel.classList.toggle('hidden', panel.dataset.panel !== tabName));
+}
+
+tabButtons.forEach((btn) => {
+  btn.addEventListener('click', () => showTab(btn.dataset.tab));
+});
+
 /**
  * 画面上の座標(screenX, screenY)付近に建築メニューを表示する。
  * 項目が選択されたらonSelectCallback(type)が呼ばれる。
@@ -20,8 +31,8 @@ export function showBuildMenu(screenX, screenY, onSelectCallback) {
   onSelect = onSelectCallback;
 
   // メニューが画面外にはみ出さないようにクランプする
-  const menuWidth = 160;
-  const menuHeight = 220;
+  const menuWidth = 170;
+  const menuHeight = 260;
   const clampedX = Math.min(screenX, window.innerWidth - menuWidth - 8);
   const clampedY = Math.min(screenY, window.innerHeight - menuHeight - 8);
 

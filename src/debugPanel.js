@@ -1,3 +1,4 @@
+const chunksEl = document.getElementById('stat-chunks');
 const tilesEl = document.getElementById('stat-tiles');
 const buildingsEl = document.getElementById('stat-buildings');
 const treesEl = document.getElementById('stat-trees');
@@ -39,7 +40,8 @@ export function setMuteButtonLabel(muted) {
   muteButton.textContent = muted ? '🔇' : '🔊';
 }
 
-export function updateDebugStats({ tileCount, buildingCount, treeCount, fps, instanceCount }) {
+export function updateDebugStats({ tileCount, buildingCount, treeCount, chunkCount, fps, instanceCount }) {
+  chunksEl.textContent = chunkCount;
   tilesEl.textContent = tileCount;
   buildingsEl.textContent = buildingCount;
   treesEl.textContent = treeCount;

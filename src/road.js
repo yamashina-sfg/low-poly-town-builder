@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { addInstance, UNIT_BOX_POOL } from './instancing.js';
-import { TILE_SIZE, getTile } from './terrain.js';
+import { TILE_SIZE } from './terrain.js';
 
 const ROAD_BASE_COLOR = new THREE.Color(0x777777);
 const ROAD_LINE_COLOR = new THREE.Color(0xf2f2f2);
@@ -16,11 +16,13 @@ const DIRECTIONS = [
 /**
  * 上下左右の隣接タイルが道路かどうかを判定する。
  * これにより直線・角・T字・十字の見た目が自動的に決まる。
+ * チャンクをまたいでも隣接判定できるよう、グローバルタイル座標と
+ * ルックアップ関数getGlobalTile(gx, gy)を受け取る。
  */
-export function computeRoadConnections(terrainGroup, gridX, gridY) {
+export function computeRoadConnections(getGlobalTile, globalX, globalY) {
   const connections = {};
   DIRECTIONS.forEach(({ key, dx, dz }) => {
-    const neighbor = getTile(terrainGroup, gridX + dx, gridY + dz);
+    const neighbor = getGlobalTile(globalX + dx, globalY + dz);
     connections[key] = neighbor?.userData.tileType === 'road';
   });
   return connections;

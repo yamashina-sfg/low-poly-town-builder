@@ -10,6 +10,7 @@
     <div id="app"></div>
     <div id="debug-panel" class="debug-panel">
       <div class="debug-stats">
+        <div>チャンク数: <span id="stat-chunks">0</span></div>
         <div>タイル数: <span id="stat-tiles">0</span></div>
         <div>建物数: <span id="stat-buildings">0</span></div>
         <div>木の数: <span id="stat-trees">0</span></div>
@@ -32,11 +33,37 @@
       </div>
     </div>
     <div id="build-menu" class="build-menu hidden">
-      <button type="button" data-type="house">家</button>
-      <button type="button" data-type="tree">木</button>
-      <button type="button" data-type="road">道路</button>
-      <button type="button" data-type="water">水</button>
-      <button type="button" data-type="clear">更地に戻す</button>
+      <div class="build-menu-tabs">
+        <button type="button" class="tab-button active" data-tab="buildings">建物</button>
+        <button type="button" class="tab-button" data-tab="furniture">家具</button>
+        <button type="button" class="tab-button" data-tab="decorations">装飾</button>
+        <button type="button" class="tab-button" data-tab="terrain">地形</button>
+      </div>
+      <div class="build-menu-panel" data-panel="buildings">
+        <button type="button" data-type="house">住居</button>
+        <button type="button" data-type="shop">お店</button>
+        <button type="button" data-type="well">井戸</button>
+        <button type="button" data-type="warehouse">倉庫</button>
+      </div>
+      <div class="build-menu-panel hidden" data-panel="furniture">
+        <button type="button" data-type="bed">ベッド</button>
+        <button type="button" data-type="table">テーブル</button>
+        <button type="button" data-type="chair">椅子</button>
+        <button type="button" data-type="fireplace">暖炉</button>
+      </div>
+      <div class="build-menu-panel hidden" data-panel="decorations">
+        <button type="button" data-type="fence">柵</button>
+        <button type="button" data-type="streetlamp">街灯</button>
+        <button type="button" data-type="bench">ベンチ</button>
+        <button type="button" data-type="flowerbed">花壇</button>
+        <button type="button" data-type="signpost">看板</button>
+      </div>
+      <div class="build-menu-panel hidden" data-panel="terrain">
+        <button type="button" data-type="tree">木</button>
+        <button type="button" data-type="road">道路</button>
+        <button type="button" data-type="water">水</button>
+        <button type="button" data-type="clear">更地に戻す</button>
+      </div>
     </div>
     <script type="module" src="/src/main.js"></script>
   </body>

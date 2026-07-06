@@ -1,6 +1,14 @@
 import * as THREE from 'three';
 import { mulberry32 } from './random.js';
-import { registerPool, addInstance, UNIT_BOX_POOL } from './instancing.js';
+import { addInstance } from './instancing.js';
+import {
+  UNIT_BOX_POOL,
+  UNIT_CONE_SQUARE_POOL,
+  UNIT_CONE_ROUND_POOL,
+  UNIT_TRUNK_POOL,
+  UNIT_SPHERE_POOL,
+  ZERO_ROTATION,
+} from './primitives.js';
 import {
   BUILDING_WALL_COLORS,
   BUILDING_ROOF_COLORS,
@@ -15,32 +23,6 @@ const FOOTPRINT = 1.4;
 function pick(rng, colors) {
   return colors[Math.floor(rng() * colors.length)];
 }
-
-// 底面を原点に置いた単位ジオメトリ。すべてのインスタンスで共有し、
-// 位置・回転・非一様スケール・インスタンスカラーだけで見た目を変える。
-const unitBoxGeometry = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
-const unitConeSquareGeometry = new THREE.ConeGeometry(1, 1, 4).translate(0, 0.5, 0);
-const unitConeRoundGeometry = new THREE.ConeGeometry(1, 1, 7).translate(0, 0.5, 0);
-const unitTrunkGeometry = new THREE.CylinderGeometry(0.08, 0.13, 1, 6).translate(0, 0.5, 0);
-const unitSphereGeometry = new THREE.SphereGeometry(1, 6, 5);
-
-function makeInstancedMaterial() {
-  // material.colorは白のままにして、インスタンスカラーをそのまま反映させる
-  return new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true });
-}
-
-export const UNIT_CONE_SQUARE_POOL = 'unit-cone-square';
-const UNIT_CONE_ROUND_POOL = 'unit-cone-round';
-const UNIT_TRUNK_POOL = 'unit-trunk';
-const UNIT_SPHERE_POOL = 'unit-sphere';
-
-registerPool(UNIT_BOX_POOL, unitBoxGeometry, makeInstancedMaterial());
-registerPool(UNIT_CONE_SQUARE_POOL, unitConeSquareGeometry, makeInstancedMaterial());
-registerPool(UNIT_CONE_ROUND_POOL, unitConeRoundGeometry, makeInstancedMaterial());
-registerPool(UNIT_TRUNK_POOL, unitTrunkGeometry, makeInstancedMaterial());
-registerPool(UNIT_SPHERE_POOL, unitSphereGeometry, makeInstancedMaterial());
-
-const ZERO_ROTATION = new THREE.Euler(0, 0, 0);
 
 /**
  * 立方体を1〜3段積み重ねた低ポリ建物を、InstancedMeshのインスタンスとして配置する。

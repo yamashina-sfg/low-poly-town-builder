@@ -1,22 +1,27 @@
+import { getProceduralTileType } from './chunkManager.js';
+
 const SAVE_KEY = 'lowPolyTownBuilder:save';
 
 /**
- * grass以外のタイルだけを{ x, y, type }の配列として抜き出し、
- * 現在のワールドシードと合わせてプレーンオブジェクトにする。
+ * 自然生成の下地(getProceduralTileType)と実際のタイル種別が異なるものだけを
+ * { x, y, type }として抜き出す。これにより、プレイヤーが何も触っていない
+ * 自然生成の木などは保存せずに済み（読込時に同じシードから再現される）、
+ * 逆に「自然に生えた木を更地に戻した」といった変更は正しく保存される。
  */
-export function serializeTown(terrain, worldSeed) {
+export function serializeTown(forEachLoadedTile, worldSeed) {
   const cells = [];
-  terrain.children.forEach((tile) => {
-    const { gridX, gridY, tileType } = tile.userData;
-    if (tileType !== 'grass') {
-      cells.push({ x: gridX, y: gridY, type: tileType });
+  forEachLoadedTile((tile) => {
+    const { globalX, globalY, tileType } = tile.userData;
+    const baseType = getProceduralTileType(worldSeed, globalX, globalY);
+    if (tileType !== baseType) {
+      cells.push({ x: globalX, y: globalY, type: tileType });
     }
   });
   return { seed: worldSeed, cells };
 }
 
-export function saveTownToLocalStorage(terrain, worldSeed) {
-  const data = serializeTown(terrain, worldSeed);
+export function saveTownToLocalStorage(forEachLoadedTile, worldSeed) {
+  const data = serializeTown(forEachLoadedTile, worldSeed);
   localStorage.setItem(SAVE_KEY, JSON.stringify(data));
 }
 
