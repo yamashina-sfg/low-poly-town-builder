@@ -16,8 +16,11 @@ const tmpColor = new THREE.Color();
  * ゲーム内時刻(dayFraction: 0=深夜,0.25=明け方,0.5=正午,0.75=夕方)から
  * DirectionalLight/HemisphereLightの向き・色・強さと空の色を更新する。
  * 朝・夕はオレンジ、昼は白っぽく、夜は青暗くなる。
+ * targetPosition（通常はキャラクターの位置）が渡された場合、影を落とす
+ * DirectionalLightとそのシャドウカメラの視錐台をその位置に追従させる
+ * （ワールドが無限に広いため、視錐台をキャラ周辺だけに絞るための追従）。
  */
-export function updateDayNightCycle({ dayFraction, scene, dirLight, hemiLight }) {
+export function updateDayNightCycle({ dayFraction, scene, dirLight, hemiLight, targetPosition }) {
   const angle = dayFraction * Math.PI * 2;
   const sunHeight = -Math.cos(angle); // 0時=-1(深夜) 0.25=0(明け方) 0.5=1(正午) 0.75=0(夕方)
 
@@ -25,7 +28,17 @@ export function updateDayNightCycle({ dayFraction, scene, dirLight, hemiLight })
   // 明け方・夕方（sunHeightが0付近）でオレンジみが最大になる
   const warmth = Math.max(0, 1 - Math.abs(sunHeight) * 1.6) * (sunHeight > -0.6 ? 1 : 0);
 
-  dirLight.position.set(Math.cos(angle) * 15, Math.max(sunHeight, 0.05) * 20, 10);
+  const originX = targetPosition ? targetPosition.x : 0;
+  const originY = targetPosition ? targetPosition.y : 0;
+  const originZ = targetPosition ? targetPosition.z : 0;
+  dirLight.position.set(
+    originX + Math.cos(angle) * 15,
+    originY + Math.max(sunHeight, 0.05) * 20,
+    originZ + 10,
+  );
+  if (targetPosition) {
+    dirLight.target.position.copy(targetPosition);
+  }
   dirLight.color.copy(tmpColor.copy(NIGHT_SUN).lerp(DAY_SUN, dayFactor)).lerp(DAWN_DUSK_SUN, warmth * 0.7);
   dirLight.intensity = THREE.MathUtils.lerp(0.15, 1.2, dayFactor);
 

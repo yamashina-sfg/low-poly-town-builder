@@ -25,7 +25,10 @@ import { generateWater } from '../water.js';
 import { removeInstance } from '../instancing.js';
 import { getWood, getMoney, setResources } from '../economy.js';
 import { saveTownToLocalStorage, loadTownFromLocalStorage } from '../save.js';
-import { getIndoorTiles, getIndoorSpawnPosition } from '../interior.js';
+import { getIndoorTiles, getIndoorSpawnPosition, applyRoomVariantForSeed } from '../interior.js';
+
+// 内装バリエーション選択専用のsalt（他の用途のseedと衝突しないようにするため）。
+const ROOM_VARIANT_SALT = 1800000;
 
 // 建物・家具・装飾のプロシージャル生成関数レジストリ。
 // 種類ごとに専用のseedソルトを与え、同じタイルに異なる種類を
@@ -268,6 +271,8 @@ export function enterIndoorSession(houseTile) {
   enteredHouseTile = houseTile;
   indoorMode = true;
   rebuildIndoorFurniture(houseTile);
+  const variantSeed = computeSeed(houseTile.userData.globalX, houseTile.userData.globalY, ROOM_VARIANT_SALT);
+  applyRoomVariantForSeed(variantSeed);
   return getIndoorSpawnPosition();
 }
 

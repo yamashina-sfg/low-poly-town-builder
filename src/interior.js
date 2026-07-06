@@ -12,17 +12,26 @@ const WALL_HEIGHT = 2.4;
 const WALL_THICKNESS = 0.15;
 const DOOR_WIDTH = TILE_SIZE;
 
-const FLOOR_COLOR = 0xc9a66b;
-const FLOOR_HOVER_COLOR = 0xe0c48a;
-const WALL_COLOR = 0xe8dcc0;
-const CEILING_COLOR = 0xd8cdb0;
+// 住居ごとにseedから決定論的に選ばれる内装バリエーション（壁紙・床材の色違い）。
+export const ROOM_VARIANTS = [
+  { floor: 0xc9a66b, floorHover: 0xe0c48a, wall: 0xe8dcc0, ceiling: 0xd8cdb0 }, // 木目調（既定）
+  { floor: 0x8a97a8, floorHover: 0xa8b6c9, wall: 0xd8e2e8, ceiling: 0xc5d0d8 }, // 青みがかったモダン内装
+  { floor: 0x9c6b5a, floorHover: 0xc08a76, wall: 0xf0e2c9, ceiling: 0xe0cfa8 }, // 赤みの強い暖色内装
+];
 
 let indoorTiles = [];
+const floorMaterials = [];
+let wallMaterial = null;
+let ceilingMaterial = null;
+let activeFloorColor = ROOM_VARIANTS[0].floor;
+let activeFloorHoverColor = ROOM_VARIANTS[0].floorHover;
 
 function addBox(group, w, h, d, x, y, z, material) {
   const geometry = new THREE.BoxGeometry(w, h, d);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
   group.add(mesh);
   return mesh;
 }
@@ -41,8 +50,10 @@ export function initInteriorRoom(scene) {
     for (let tx = 0; tx < ROOM_TILES; tx += 1) {
       const geometry = new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE);
       geometry.rotateX(-Math.PI / 2);
-      const material = new THREE.MeshStandardMaterial({ color: FLOOR_COLOR, flatShading: true });
+      const material = new THREE.MeshStandardMaterial({ color: activeFloorColor, flatShading: true });
+      floorMaterials.push(material);
       const tile = new THREE.Mesh(geometry, material);
+      tile.receiveShadow = true;
       tile.position.set(
         ox - half + tx * TILE_SIZE + TILE_SIZE / 2,
         0,
@@ -58,8 +69,8 @@ export function initInteriorRoom(scene) {
     }
   }
 
-  const wallMaterial = new THREE.MeshStandardMaterial({ color: WALL_COLOR, flatShading: true });
-  const ceilingMaterial = new THREE.MeshStandardMaterial({ color: CEILING_COLOR, flatShading: true });
+  wallMaterial = new THREE.MeshStandardMaterial({ color: ROOM_VARIANTS[0].wall, flatShading: true });
+  ceilingMaterial = new THREE.MeshStandardMaterial({ color: ROOM_VARIANTS[0].ceiling, flatShading: true });
 
   // 北壁・東壁・西壁
   addBox(
@@ -132,5 +143,27 @@ export function getIndoorSpawnPosition() {
 }
 
 export function setIndoorTileHighlighted(tile, highlighted) {
-  tile.material.color.set(highlighted ? FLOOR_HOVER_COLOR : FLOOR_COLOR);
+  tile.material.color.set(highlighted ? activeFloorHoverColor : activeFloorColor);
+}
+
+/**
+ * seed（住居タイルのグローバル座標などから決定論的に算出した値）から
+ * 内装バリエーションのインデックスを求める純粋関数（テスト用に公開）。
+ */
+export function getRoomVariantIndexForSeed(seed) {
+  return seed % ROOM_VARIANTS.length;
+}
+
+/**
+ * 指定したseedに対応する内装バリエーション（壁紙・床材の色）を、既存の
+ * 部屋（床タイル・壁・天井）へ適用する。部屋は住居ごとに作り直すのではなく
+ * 使い回す1つのシーンなので、入室のたびに配色だけを塗り替える。
+ */
+export function applyRoomVariantForSeed(seed) {
+  const variant = ROOM_VARIANTS[getRoomVariantIndexForSeed(seed)];
+  activeFloorColor = variant.floor;
+  activeFloorHoverColor = variant.floorHover;
+  floorMaterials.forEach((material) => material.color.set(variant.floor));
+  wallMaterial?.color.set(variant.wall);
+  ceilingMaterial?.color.set(variant.ceiling);
 }

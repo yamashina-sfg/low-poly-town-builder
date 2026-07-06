@@ -70,6 +70,8 @@ const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerH
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 app.appendChild(renderer.domElement);
 
 window.addEventListener('resize', () => {
@@ -86,7 +88,20 @@ scene.add(hemiLight);
 
 const dirLight = new THREE.DirectionalLight(0xfff2d6, 1.2);
 dirLight.position.set(10, 20, 10);
+dirLight.castShadow = true;
+// 低ポリスタイルを崩さない程度の控えめな解像度。
+// シャドウカメラの視錐台はキャラの周囲のみをカバーし（ワールド全体ではない）、
+// 毎フレームキャラの位置に追従させる（dayNightCycle.jsが更新する）。
+dirLight.shadow.mapSize.set(1024, 1024);
+dirLight.shadow.camera.near = 1;
+dirLight.shadow.camera.far = 60;
+dirLight.shadow.camera.left = -25;
+dirLight.shadow.camera.right = 25;
+dirLight.shadow.camera.top = 25;
+dirLight.shadow.camera.bottom = -25;
+dirLight.shadow.bias = -0.002;
 scene.add(dirLight);
+scene.add(dirLight.target);
 
 // ------------------------------------------------------------------
 // 建物の内部（住居のみ）・ミニマップ
@@ -223,7 +238,7 @@ function animate() {
   advanceGameTime(delta);
   advanceSleepiness(delta);
   const { dayFraction } = getGameTime();
-  updateDayNightCycle({ dayFraction, scene, dirLight, hemiLight });
+  updateDayNightCycle({ dayFraction, scene, dirLight, hemiLight, targetPosition: getCharacterPosition() });
 
   updateInteractionTarget();
 

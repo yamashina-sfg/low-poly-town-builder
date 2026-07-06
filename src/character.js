@@ -10,6 +10,7 @@ function createLimb(material, length, radius) {
   const geometry = new THREE.CapsuleGeometry(radius, length - radius * 2, 4, 6);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.position.y = -length / 2;
+  mesh.castShadow = true;
   pivot.add(mesh);
   return pivot;
 }
@@ -37,17 +38,38 @@ export function createCharacter({ clothingColor = 0x3b6ea5, hatColor = 0xb5533c 
   const bodyGeometry = new THREE.CapsuleGeometry(0.32, 0.55, 4, 8);
   const body = new THREE.Mesh(bodyGeometry, clothingMaterial);
   body.position.y = 1.05;
+  body.castShadow = true;
   group.add(body);
 
   const headGeometry = new THREE.SphereGeometry(0.32, 8, 6);
   const head = new THREE.Mesh(headGeometry, skinMaterial);
   head.position.y = 1.68;
+  head.castShadow = true;
   group.add(head);
 
   const hatGeometry = new THREE.ConeGeometry(0.35, 0.36, 6);
   const hat = new THREE.Mesh(hatGeometry, hatMaterial);
   hat.position.y = 2.06;
+  hat.castShadow = true;
   group.add(hat);
+
+  // どちらを向いているか一目で分かるよう、帽子のつばを前方(+Z)に伸ばし、
+  // 胸に小さなボタンを付ける（+Zはcharacter.rotation.y=facingとしたときに
+  // 実際の進行方向を向くローカル軸。詳細はplayer.jsのカメラ回帰テスト参照）。
+  const brimGeometry = new THREE.BoxGeometry(0.42, 0.05, 0.2);
+  const hatBrim = new THREE.Mesh(brimGeometry, hatMaterial);
+  hatBrim.name = 'hatBrim';
+  hatBrim.position.set(0, 1.93, 0.22);
+  hatBrim.castShadow = true;
+  group.add(hatBrim);
+
+  const buttonGeometry = new THREE.SphereGeometry(0.05, 6, 6);
+  const buttonMaterial = new THREE.MeshStandardMaterial({ color: 0xf2e9d8, flatShading: true });
+  const chestButton = new THREE.Mesh(buttonGeometry, buttonMaterial);
+  chestButton.name = 'chestButton';
+  chestButton.position.set(0, 1.15, 0.3);
+  chestButton.castShadow = true;
+  group.add(chestButton);
 
   const armLength = 0.58;
   const legLength = 0.75;

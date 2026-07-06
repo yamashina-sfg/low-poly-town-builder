@@ -32,6 +32,10 @@ function createPool(key, geometry, material) {
   mesh.count = 0;
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   mesh.frustumCulled = false;
+  // 建物・木・地面など全種類の低ポリオブジェクトに、控えめな解像度の
+  // 影を落とす/受け取るようにする（低ポリスタイルを崩さない程度）。
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
   const pool = { mesh, geometry, material, freeList: [], activeCount: 0, capacity: INITIAL_CAPACITY };
   pools.set(key, pool);
   return pool;
@@ -47,6 +51,8 @@ function growPool(pool) {
   const newMesh = new THREE.InstancedMesh(pool.geometry, pool.material, newCapacity);
   newMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   newMesh.frustumCulled = false;
+  newMesh.castShadow = true;
+  newMesh.receiveShadow = true;
   newMesh.count = pool.mesh.count;
 
   newMesh.instanceMatrix.array.set(pool.mesh.instanceMatrix.array);

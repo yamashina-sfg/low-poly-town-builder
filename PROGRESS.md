@@ -187,3 +187,29 @@
   WASD移動でチャンク境界を6回またいでもチャンク数が9のまま変化しないことを
   確認。あわせて`npm run lint`・`npm test`（34件）・`npm run build`が
   すべて成功することを確認
+
+## フェーズ18：ビジュアル強化
+
+- DirectionalLightのcastShadowを有効化し、キャラクター・NPC・建物・木・
+  地面にシャドウマップを適用（`renderer.shadowMap`, `dirLight.shadow`を
+  main.jsで設定。`instancing.js`のInstancedMeshプールにcastShadow/
+  receiveShadowを一括設定し、`character.js`の各パーツにもcastShadowを設定）。
+  ワールドが無限に広いため、シャドウカメラの視錐台（40x40程度）と
+  DirectionalLightはキャラクターの位置に追従させる
+  （`dayNightCycle.js`のupdateDayNightCycleにtargetPositionを追加）
+- プレイヤー・NPCの向きが一目で分かるよう、帽子のつばと胸のボタンを
+  ローカル+Z方向（`character.rotation.y=facing`としたときの実際の進行方向。
+  フェーズ17のカメラ回帰テストと同じ前提）に追加（`character.js`）
+- 住居ごとにseedから決定論的に選ばれる内装バリエーション（壁紙・床材の
+  色違い3種）を追加。部屋自体は使い回しつつ、入室時に色だけ塗り替える
+  （`interior.js`の`applyRoomVariantForSeed`、`world.js`の
+  `enterIndoorSession`から呼び出し）
+- 建物・NPCの配色パレットに彩度・色相の幅を持たせ、単調さを軽減
+  （`palette.js`, `game/populace.js`）
+- 動作確認：Vitestで（1）帽子のつば/胸のボタンが+Z（前方）にあること、
+  （2）主要パーツのcastShadowが有効なこと、（3）内装バリエーションが
+  seedから決定論的に選ばれ、ROOM_VARIANTSの範囲に収まり、実際に床材の
+  色が変わることを確認（5件追加、計39件）。Playwrightで、日の出直後の
+  斜光下でキャラクター・木の影が地面に落ちていること、住居に入室しても
+  クラッシュしないことをスクリーンショットで確認。コンソールエラーなし。
+  `npm run lint`・`npm run build`も成功

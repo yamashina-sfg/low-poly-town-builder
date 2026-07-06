@@ -3,8 +3,10 @@ import { createBird, createDog } from '../creatures.js';
 import { pushEntitiesApart } from '../collision.js';
 import { resolveOutdoorCollision } from './world.js';
 
-const NPC_CLOTHING_COLORS = [0xc94c4c, 0x4c7ac9, 0xc9a94c, 0x4cae7a, 0x8a5fd9, 0xe07a9a];
-const NPC_HAT_COLORS = [0x5c5c5c, 0x7a4a3a, 0x3f6b3a, 0x455a64];
+const NPC_CLOTHING_COLORS = [
+  0xc94c4c, 0x4c7ac9, 0xc9a94c, 0x4cae7a, 0x8a5fd9, 0xe07a9a, 0x4cc9c0, 0xd97f2e, 0x7a9a3f, 0xa84ca0,
+];
+const NPC_HAT_COLORS = [0x5c5c5c, 0x7a4a3a, 0x3f6b3a, 0x455a64, 0x8a3f5c, 0x3f5c8a];
 const NPC_COLLISION_RADIUS = 0.35;
 const DOG_COLLISION_RADIUS = 0.22;
 const NPC_COUNT = 6;
