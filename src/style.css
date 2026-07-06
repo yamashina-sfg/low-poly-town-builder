@@ -16,6 +16,26 @@ canvas {
   display: block;
 }
 
+.exit-building-button {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(20, 20, 20, 0.8);
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.exit-building-button.hidden {
+  display: none;
+}
+
 .debug-panel {
   position: fixed;
   top: 8px;

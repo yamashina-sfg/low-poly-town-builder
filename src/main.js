@@ -28,6 +28,14 @@ import { saveTownToLocalStorage, loadTownFromLocalStorage } from './save.js';
 import { createCharacter } from './character.js';
 import { updateDayNightCycle } from './dayNightCycle.js';
 import { startAmbientAudio, setAmbientMuted } from './ambientAudio.js';
+import {
+  initInteriorRoom,
+  getIndoorTiles,
+  getIndoorSpawnPosition,
+  setIndoorTileHighlighted,
+  INTERIOR_OFFSET,
+  ROOM_SIZE,
+} from './interior.js';
 
 // ------------------------------------------------------------------
 // シーン基本セットアップ
@@ -86,6 +94,17 @@ const PROCEDURAL_GENERATORS = {
 };
 
 const BUILDING_TYPES = new Set(['house', 'shop', 'well', 'warehouse']);
+const FURNITURE_TYPES = new Set(['bed', 'table', 'chair', 'fireplace']);
+
+// ------------------------------------------------------------------
+// 建物の内部（住居のみ）：シンプルな1部屋の室内シーン
+// ------------------------------------------------------------------
+initInteriorRoom(scene);
+const indoorTiles = getIndoorTiles();
+let indoorMode = false;
+let enteredHouseTile = null;
+const outdoorReturnPosition = new THREE.Vector3();
+let outdoorReturnFacing = 0;
 
 // ------------------------------------------------------------------
 // 地面（10x10タイル単位のチャンクが、歩いた先に自動生成される）
@@ -140,6 +159,7 @@ const isPressed = (...codes) => codes.some((code) => keys[code]);
 // カメラ（三人称・キャラ追従）
 // ------------------------------------------------------------------
 const CAMERA_OFFSET = new THREE.Vector3(0, 4.5, 7);
+const INDOOR_CAMERA_OFFSET = new THREE.Vector3(0, 2.4, 3.2);
 const cameraCurrentPosition = new THREE.Vector3()
   .copy(character.position)
   .add(CAMERA_OFFSET);
@@ -165,7 +185,8 @@ function updatePointerFromEvent(event) {
 function getIntersectedTile(event) {
   updatePointerFromEvent(event);
   raycaster.setFromCamera(pointer, camera);
-  const intersects = raycaster.intersectObjects(getVisibleTileMeshes(), false);
+  const candidates = indoorMode ? indoorTiles : getVisibleTileMeshes();
+  const intersects = raycaster.intersectObjects(candidates, false);
   return intersects.length > 0 ? intersects[0].object : null;
 }
 
@@ -221,6 +242,13 @@ function buildOnTile(tile, type, { animate = true } = {}) {
   clearTileObject(tile);
   tile.userData.tileType = type === 'clear' ? 'grass' : type;
 
+  if (type === 'house') {
+    // 住居タイルは室内の家具配置(9マス分)を保持する。既存の住居を建て直しても消えない。
+    tile.userData.indoorFurniture = tile.userData.indoorFurniture ?? new Array(indoorTiles.length).fill(null);
+  } else {
+    tile.userData.indoorFurniture = undefined;
+  }
+
   const { globalX, globalY } = tile.userData;
   const generatorEntry = PROCEDURAL_GENERATORS[type];
 
@@ -238,6 +266,99 @@ function buildOnTile(tile, type, { animate = true } = {}) {
 
   // このタイルの変化で隣接する道路タイルの接続形状が変わるかもしれないため更新する
   getNeighborTiles(tile).forEach(refreshRoadTile);
+}
+
+/**
+ * 住居タイルに保存されている家具レイアウトから、室内の3x3タイルを作り直す。
+ */
+function rebuildIndoorFurniture(houseTile) {
+  const layout = houseTile.userData.indoorFurniture;
+  indoorTiles.forEach((indoorTile) => {
+    clearTileObject(indoorTile);
+    const type = layout[indoorTile.userData.localIndex];
+    const generatorEntry = type ? PROCEDURAL_GENERATORS[type] : null;
+    if (generatorEntry) {
+      const seed = computeSeed(
+        houseTile.userData.globalX,
+        houseTile.userData.globalY,
+        generatorEntry.salt + indoorTile.userData.localIndex
+      );
+      indoorTile.userData.tileType = type;
+      indoorTile.userData.object = generatorEntry.generate(seed, indoorTile.position, { animate: false });
+    } else {
+      indoorTile.userData.tileType = 'grass';
+    }
+  });
+}
+
+/**
+ * 室内の家具配置を変更する（家具カテゴリのみ、または更地に戻す）。
+ */
+function buildOnIndoorTile(indoorTile, type) {
+  if (!enteredHouseTile) return;
+  if (type !== 'clear' && !FURNITURE_TYPES.has(type)) return;
+
+  const layout = enteredHouseTile.userData.indoorFurniture;
+  layout[indoorTile.userData.localIndex] = type === 'clear' ? null : type;
+
+  clearTileObject(indoorTile);
+  const generatorEntry = type === 'clear' ? null : PROCEDURAL_GENERATORS[type];
+  if (generatorEntry) {
+    const seed = computeSeed(
+      enteredHouseTile.userData.globalX,
+      enteredHouseTile.userData.globalY,
+      generatorEntry.salt + indoorTile.userData.localIndex
+    );
+    indoorTile.userData.tileType = type;
+    indoorTile.userData.object = generatorEntry.generate(seed, indoorTile.position, { animate: true });
+  } else {
+    indoorTile.userData.tileType = 'grass';
+  }
+}
+
+/**
+ * テレポート（入室・退室）直後にカメラが古い位置から緩やかに追従してしまい
+ * 何も見えない空白フレームが出ないよう、カメラを即座にキャラの背後へスナップする。
+ */
+function snapCameraToCharacter() {
+  const offset = indoorMode ? INDOOR_CAMERA_OFFSET : CAMERA_OFFSET;
+  const rotatedOffset = offset.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), characterFacing);
+  cameraCurrentPosition.copy(character.position).add(rotatedOffset);
+  camera.position.copy(cameraCurrentPosition);
+  camera.lookAt(character.position.clone().add(new THREE.Vector3(0, 1, 0)));
+}
+
+function enterHouse(houseTile) {
+  if (indoorMode) return;
+  outdoorReturnPosition.copy(character.position);
+  outdoorReturnFacing = characterFacing;
+  enteredHouseTile = houseTile;
+  indoorMode = true;
+
+  rebuildIndoorFurniture(houseTile);
+  const spawn = getIndoorSpawnPosition();
+  character.position.copy(spawn);
+  characterFacing = 0;
+  character.rotation.y = 0;
+  characterController.group.scale.setScalar(0.7);
+  snapCameraToCharacter();
+
+  document.getElementById('exit-building-button').classList.remove('hidden');
+}
+
+function exitHouse() {
+  if (!indoorMode) return;
+  indoorMode = false;
+  enteredHouseTile = null;
+
+  character.position.copy(outdoorReturnPosition);
+  characterFacing = outdoorReturnFacing;
+  character.rotation.y = outdoorReturnFacing;
+  characterController.group.scale.setScalar(1);
+  snapCameraToCharacter();
+
+  hideBuildMenu();
+  document.getElementById('exit-building-button').classList.add('hidden');
 }
 
 function getTownStats() {
@@ -319,17 +440,25 @@ function beginAudioOnFirstInteraction() {
 window.addEventListener('keydown', beginAudioOnFirstInteraction, { once: true });
 window.addEventListener('click', beginAudioOnFirstInteraction, { once: true });
 
+function highlightTile(tile, highlighted) {
+  if (indoorMode) {
+    setIndoorTileHighlighted(tile, highlighted);
+  } else {
+    setTileHighlighted(tile, highlighted);
+  }
+}
+
 renderer.domElement.addEventListener('pointermove', (event) => {
   const tile = getIntersectedTile(event);
   if (tile !== hoveredTile) {
-    if (hoveredTile) setTileHighlighted(hoveredTile, false);
+    if (hoveredTile) highlightTile(hoveredTile, false);
     hoveredTile = tile;
-    if (hoveredTile) setTileHighlighted(hoveredTile, true);
+    if (hoveredTile) highlightTile(hoveredTile, true);
   }
 });
 
 renderer.domElement.addEventListener('pointerleave', () => {
-  if (hoveredTile) setTileHighlighted(hoveredTile, false);
+  if (hoveredTile) highlightTile(hoveredTile, false);
   hoveredTile = null;
 });
 
@@ -339,9 +468,24 @@ renderer.domElement.addEventListener('click', (event) => {
     hideBuildMenu();
     return;
   }
+
+  if (!indoorMode && tile.userData.tileType === 'house') {
+    enterHouse(tile);
+    return;
+  }
+
   showBuildMenu(event.clientX, event.clientY, (type) => {
-    buildOnTile(tile, type);
+    if (indoorMode) {
+      buildOnIndoorTile(tile, type);
+    } else {
+      buildOnTile(tile, type);
+    }
   });
+});
+
+document.getElementById('exit-building-button').addEventListener('click', exitHouse);
+window.addEventListener('keydown', (event) => {
+  if (event.code === 'Escape' && indoorMode) exitHouse();
 });
 
 // ------------------------------------------------------------------
@@ -404,9 +548,22 @@ function animate() {
   }
   characterController.updateWalkAnimation(isMoving, delta);
 
-  // キャラが今いるチャンクが変わったら、周囲3x3チャンクの生成漏れを埋め、
-  // 遠くのチャンクは非表示にして描画をスキップする
-  if (isMoving) {
+  if (indoorMode) {
+    // 室内では部屋の範囲内にキャラを収める（チャンクの生成・可視化更新は行わない）
+    const roomHalf = ROOM_SIZE / 2 - 0.4;
+    character.position.x = THREE.MathUtils.clamp(
+      character.position.x,
+      INTERIOR_OFFSET.x - roomHalf,
+      INTERIOR_OFFSET.x + roomHalf
+    );
+    character.position.z = THREE.MathUtils.clamp(
+      character.position.z,
+      INTERIOR_OFFSET.z - roomHalf,
+      INTERIOR_OFFSET.z + roomHalf
+    );
+  } else if (isMoving) {
+    // キャラが今いるチャンクが変わったら、周囲3x3チャンクの生成漏れを埋め、
+    // 遠くのチャンクは非表示にして描画をスキップする
     const currentChunk = ensureChunksAround(
       character.position.x,
       character.position.z,
@@ -418,8 +575,9 @@ function animate() {
     }
   }
 
-  // カメラをキャラの向きに応じて斜め後ろ上空に滑らかに追従させる
-  const rotatedOffset = CAMERA_OFFSET.clone().applyAxisAngle(
+  // カメラをキャラの向きに応じて斜め後ろ上空に滑らかに追従させる（室内では近め）
+  const activeCameraOffset = indoorMode ? INDOOR_CAMERA_OFFSET : CAMERA_OFFSET;
+  const rotatedOffset = activeCameraOffset.clone().applyAxisAngle(
     new THREE.Vector3(0, 1, 0),
     characterFacing
   );
