@@ -49,3 +49,16 @@ export function hideBuildMenu() {
 export function isBuildMenuOpen() {
   return !menuEl.classList.contains('hidden');
 }
+
+/**
+ * まだ解放されていない種類のボタンをグレーアウトして選べないようにする
+ * （フェーズ19：評判スコアによる建築物のアンロック）。
+ */
+export function updateLockedButtons(lockedTypes) {
+  const lockedSet = new Set(lockedTypes);
+  menuEl.querySelectorAll('button[data-type]').forEach((btn) => {
+    const locked = lockedSet.has(btn.dataset.type);
+    btn.disabled = locked;
+    btn.classList.toggle('locked', locked);
+  });
+}

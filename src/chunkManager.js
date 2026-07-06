@@ -7,6 +7,11 @@ const TREE_SCATTER_CHANCE = 0.06;
 const SPAWN_GLOBAL_X = 5;
 const SPAWN_GLOBAL_Y = 5;
 
+// 探索の報酬（フェーズ19）：拠点からある程度離れた場所にだけ、ごく低確率で
+// 「廃墟」または「特殊な木」をランドマークとして自然生成する。
+const LANDMARK_CHANCE = 0.004;
+const LANDMARK_MIN_DISTANCE_TILES = 15;
+
 // キャラの周囲このチャンク半径だけ読み込んだ状態を維持する（3x3）。
 // これより外側のチャンクは訪問後すぐにアンロード（破棄）される。
 const LOAD_RADIUS = 1;
@@ -55,6 +60,14 @@ export function getProceduralTileType(worldSeed, globalX, globalY) {
   if (globalX === SPAWN_GLOBAL_X && globalY === SPAWN_GLOBAL_Y) return 'grass';
   const seed = ((worldSeed * 486187739) ^ (globalX * 374761393) ^ (globalY * 668265263)) >>> 0;
   const rng = mulberry32(seed);
+
+  // 拠点からLANDMARK_MIN_DISTANCE_TILES以上離れた場所でのみ、ごく低確率で
+  // 廃墟／特殊な木のいずれかをランドマークとして生成する。
+  const distanceFromSpawn = Math.hypot(globalX - SPAWN_GLOBAL_X, globalY - SPAWN_GLOBAL_Y);
+  if (distanceFromSpawn >= LANDMARK_MIN_DISTANCE_TILES && rng() < LANDMARK_CHANCE) {
+    return rng() < 0.5 ? 'ruins' : 'specialTree';
+  }
+
   return rng() < TREE_SCATTER_CHANCE ? 'tree' : 'grass';
 }
 

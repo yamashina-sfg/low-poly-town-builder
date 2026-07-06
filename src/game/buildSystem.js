@@ -4,6 +4,7 @@ import { setIndoorTileHighlighted } from '../interior.js';
 import { showBuildMenu, hideBuildMenu } from '../buildMenu.js';
 import { canAfford, pay } from '../economy.js';
 import { isIndoorMode, getIndoorTilesList, buildOnTile, buildOnIndoorTile } from './world.js';
+import { getCurrentLockedTypes } from './progression.js';
 import { showStatusMessage } from './statusMessage.js';
 import { updateResourcePanel } from './resourcePanel.js';
 
@@ -85,6 +86,10 @@ function handleClick(event) {
   }
 
   showBuildMenu(event.clientX, event.clientY, (type) => {
+    if (getCurrentLockedTypes().includes(type)) {
+      showStatusMessage('まだ解放されていません');
+      return;
+    }
     if (!canAfford(type)) {
       showStatusMessage('木材またはお金が足りない');
       return;

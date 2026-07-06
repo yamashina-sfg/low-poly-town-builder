@@ -83,20 +83,23 @@ function sleep() {
  * 木に近づいて伐採する：木材を入手し、タイルを更地に戻す。
  */
 function chopTree(tile) {
-  const amount = 3 + Math.floor(Math.random() * 4);
+  // 特殊な木（探索の報酬として自然生成されるランドマーク）は資源が豊富で、
+  // 通常の木より多くの木材が手に入る。
+  const isSpecial = tile.userData.tileType === 'specialTree';
+  const amount = isSpecial ? 15 + Math.floor(Math.random() * 11) : 3 + Math.floor(Math.random() * 4);
   addWood(amount);
   const leafPosition = tile.position.clone().add(new THREE.Vector3(0, 0.9, 0));
   spawnParticleBurst(sceneRef, {
     position: leafPosition,
-    count: 10,
-    color: 0x6b8e3d,
+    count: isSpecial ? 18 : 10,
+    color: isSpecial ? 0xc9a227 : 0x6b8e3d,
     size: 0.1,
     speed: 2.2,
     life: 1,
     gravity: -3,
   });
   buildOnTile(tile, 'clear');
-  showStatusMessage(`木材を${amount}個手に入れた`);
+  showStatusMessage(isSpecial ? `特殊な木から木材を${amount}個手に入れた！` : `木材を${amount}個手に入れた`);
 }
 
 function openShop() {

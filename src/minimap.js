@@ -10,6 +10,7 @@ const TILE_TYPE_COLORS = {
   shop: '#e8d9a8',
   well: '#9a9a8c',
   warehouse: '#8a7a5c',
+  windmill: '#d8c9a3',
   road: '#8a8a8a',
   water: '#3a7ca5',
   bed: '#c9a66b',
@@ -21,6 +22,9 @@ const TILE_TYPE_COLORS = {
   bench: '#8a5a3c',
   flowerbed: '#d9455f',
   signpost: '#8a5a3c',
+  statue: '#7c9a8a',
+  ruins: '#8a8a7c',
+  specialTree: '#c9a227',
 };
 
 let ctx = null;

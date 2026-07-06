@@ -20,7 +20,7 @@ import { spawnSparkle, updateParticles } from './particles.js';
 import { updateWaterTime } from './water.js';
 import { initMinimap, updateMinimap } from './minimap.js';
 import { initInteriorRoom, INTERIOR_OFFSET, ROOM_SIZE } from './interior.js';
-import { hideBuildMenu } from './buildMenu.js';
+import { hideBuildMenu, updateLockedButtons } from './buildMenu.js';
 import { forEachLoadedTile } from './chunkManager.js';
 
 import {
@@ -37,6 +37,7 @@ import {
   getWaterTiles,
   enterIndoorSession,
   exitIndoorSession,
+  setLandmarkDiscoveredHandler,
 } from './game/world.js';
 import {
   initPlayer,
@@ -56,6 +57,7 @@ import { initInteractions, updateInteractionTarget, handleActionKey } from './ga
 import { initPopulace, updatePopulace, resolvePopulaceInterCollisions } from './game/populace.js';
 import { showStatusMessage } from './game/statusMessage.js';
 import { updateResourcePanel } from './game/resourcePanel.js';
+import { updateProgression, recordLandmarkDiscovered, getCurrentLockedTypes } from './game/progression.js';
 
 // ------------------------------------------------------------------
 // シーン基本セットアップ
@@ -115,6 +117,7 @@ initMinimap();
 setInstancingScene(scene);
 getAllPoolMeshes().forEach((mesh) => scene.add(mesh));
 initWorld(scene);
+setLandmarkDiscoveredHandler(recordLandmarkDiscovered);
 
 // ------------------------------------------------------------------
 // キャラクター・NPC・小動物
@@ -257,6 +260,8 @@ function animate() {
     });
     updateTimeAndSleepiness(formatGameTime(), Math.round(getSleepiness()));
     updateResourcePanel();
+    updateProgression();
+    updateLockedButtons(getCurrentLockedTypes());
     fpsFrameCount = 0;
     fpsElapsed = 0;
   }

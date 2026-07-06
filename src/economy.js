@@ -1,12 +1,16 @@
 // 所持リソース（木材・お金）と建築コストを管理する。
 let wood = 20;
 let money = 100;
+// 実績（フェーズ19）用に、これまで伐採・入手した木材の累計を別途記録する
+// （現在の所持数とは異なり、使っても減らない一方向のカウンター）。
+let totalWoodCollected = 0;
 
 export const BUILD_COSTS = {
   house: { wood: 20, money: 50 },
   shop: { wood: 15, money: 80 },
   well: { wood: 5, money: 10 },
   warehouse: { wood: 30, money: 40 },
+  windmill: { wood: 25, money: 60 },
   bed: { wood: 10, money: 0 },
   table: { wood: 6, money: 0 },
   chair: { wood: 3, money: 0 },
@@ -16,6 +20,7 @@ export const BUILD_COSTS = {
   bench: { wood: 6, money: 0 },
   flowerbed: { wood: 0, money: 5 },
   signpost: { wood: 4, money: 0 },
+  statue: { wood: 5, money: 40 },
 };
 
 export function getWood() {
@@ -57,6 +62,15 @@ export function pay(type) {
 
 export function addWood(amount) {
   wood += amount;
+  totalWoodCollected += amount;
+}
+
+/**
+ * これまでに伐採・入手した木材の累計（所持数と違い、使っても減らない）。
+ * 実績「木材を100集めた」の判定に使う。
+ */
+export function getTotalWoodCollected() {
+  return totalWoodCollected;
 }
 
 export function trySpendMoney(amount) {

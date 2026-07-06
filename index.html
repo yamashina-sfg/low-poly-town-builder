@@ -8,6 +8,10 @@
   </head>
   <body>
     <div id="app"></div>
+    <div id="reputation-panel" class="reputation-panel">
+      <div id="reputation-title">静かな原っぱ</div>
+      <div>評判: <span id="reputation-score">0</span></div>
+    </div>
     <button type="button" id="exit-building-button" class="exit-building-button hidden">
       外に出る (Esc)
     </button>
@@ -68,6 +72,7 @@
         <button type="button" data-type="shop">お店</button>
         <button type="button" data-type="well">井戸</button>
         <button type="button" data-type="warehouse">倉庫</button>
+        <button type="button" data-type="windmill" class="locked" disabled>風車（評判30で解放）</button>
       </div>
       <div class="build-menu-panel hidden" data-panel="furniture">
         <button type="button" data-type="bed">ベッド</button>
@@ -81,6 +86,7 @@
         <button type="button" data-type="bench">ベンチ</button>
         <button type="button" data-type="flowerbed">花壇</button>
         <button type="button" data-type="signpost">看板</button>
+        <button type="button" data-type="statue" class="locked" disabled>銅像（評判50で解放）</button>
       </div>
       <div class="build-menu-panel hidden" data-panel="terrain">
         <button type="button" data-type="tree">木</button>

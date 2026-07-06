@@ -34,3 +34,20 @@ export const FLOWER_COLORS = [0xd9455f, 0xe98bc0, 0x8a5fd9, 0xe9c53f, 0xf2f2f2];
 export const SOIL_COLOR = 0x4a3626;
 
 export const SIGN_BOARD_COLOR = 0xd8c9a3;
+
+// 風車：木造の塔＋羽根
+export const WINDMILL_TOWER_COLOR = 0xd8c9a3;
+export const WINDMILL_BLADE_COLOR = 0xe8e0c9;
+export const WINDMILL_ROOF_COLOR = 0x7a4a3a;
+
+// 銅像：緑青がかった石像
+export const STATUE_COLOR = 0x7c9a8a;
+export const STATUE_BASE_COLOR = 0x9a9a8c;
+
+// 廃墟：自然生成のランドマーク。苔むした灰色
+export const RUINS_COLOR = 0x8a8a7c;
+export const RUINS_MOSS_COLOR = 0x6b7a5c;
+
+// 特殊な木：資源が豊富な、金色がかった巨木
+export const SPECIAL_TREE_TRUNK_COLOR = 0x7a5a3a;
+export const SPECIAL_TREE_LEAF_COLOR = 0xc9a227;

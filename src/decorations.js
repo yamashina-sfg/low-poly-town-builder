@@ -9,6 +9,8 @@ import {
   FLOWER_COLORS,
   SOIL_COLOR,
   SIGN_BOARD_COLOR,
+  STATUE_COLOR,
+  STATUE_BASE_COLOR,
 } from './palette.js';
 
 function pick(rng, colors) {
@@ -194,6 +196,51 @@ export function generateSignpost(seed, tilePosition, { animate = true } = {}) {
       ZERO_ROTATION,
       new THREE.Vector3(0.5, 0.35, 0.05),
       boardColor,
+      { animate },
+    ),
+  );
+
+  return { kind: 'instances', parts };
+}
+
+/**
+ * 銅像：四角い台座＋人型を単純化した胴体・頭のシルエット。
+ * フェーズ19で「町の評判」が一定値に達すると解放される装飾。
+ */
+export function generateStatue(seed, tilePosition, { animate = true } = {}) {
+  const parts = [];
+  const baseColor = new THREE.Color(STATUE_BASE_COLOR);
+  const statueColor = new THREE.Color(STATUE_COLOR);
+
+  parts.push(
+    addInstance(
+      UNIT_BOX_POOL,
+      new THREE.Vector3(tilePosition.x, 0, tilePosition.z),
+      ZERO_ROTATION,
+      new THREE.Vector3(0.7, 0.25, 0.7),
+      baseColor,
+      { animate },
+    ),
+  );
+
+  parts.push(
+    addInstance(
+      UNIT_CYLINDER_POOL,
+      new THREE.Vector3(tilePosition.x, 0.25, tilePosition.z),
+      ZERO_ROTATION,
+      new THREE.Vector3(0.22, 0.75, 0.22),
+      statueColor,
+      { animate },
+    ),
+  );
+
+  parts.push(
+    addInstance(
+      UNIT_SPHERE_POOL,
+      new THREE.Vector3(tilePosition.x, 1.05, tilePosition.z),
+      ZERO_ROTATION,
+      new THREE.Vector3(0.18, 0.18, 0.18),
+      statueColor,
       { animate },
     ),
   );

@@ -60,6 +60,25 @@ describe('getProceduralTileType', () => {
       expect(['grass', 'tree']).toContain(getProceduralTileType(1, gx, 0));
     }
   });
+
+  test('拠点から近い場所（探索の報酬の対象外）にはランドマークが出現しない', () => {
+    // スポーン(5,5)周辺、半径15タイル未満の範囲はすべてgrass/treeのみになるはず
+    for (let gx = -5; gx <= 15; gx += 1) {
+      for (let seed = 0; seed < 5; seed += 1) {
+        expect(['grass', 'tree']).toContain(getProceduralTileType(seed, gx, 5));
+      }
+    }
+  });
+
+  test('拠点から十分離れた場所には、低確率でruins/specialTreeが出現しうる', () => {
+    // LANDMARK_CHANCE(0.004)に対して十分なサンプル数を取り、
+    // 統計的にほぼ確実に最低1つは出現するようにする（期待値約8個）。
+    const results = new Set();
+    for (let gx = 100; gx < 2100; gx += 1) {
+      results.add(getProceduralTileType(1, gx, 100));
+    }
+    expect(results.has('ruins') || results.has('specialTree')).toBe(true);
+  });
 });
 
 describe('チャンクの読込・アンロードと差分キャッシュ（フェーズ16の復元ロジック）', () => {

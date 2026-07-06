@@ -11,7 +11,9 @@ export const TILE_COLLISION_RADII = {
   shop: 1.05,
   well: 0.5,
   warehouse: 1.1,
+  windmill: 0.5,
   tree: 0.35,
+  specialTree: 0.85,
   water: 1.05,
   bed: 0.5,
   table: 0.4,
@@ -22,6 +24,8 @@ export const TILE_COLLISION_RADII = {
   bench: 0.5,
   flowerbed: 0.6,
   signpost: 0.2,
+  statue: 0.4,
+  ruins: 0.5,
 };
 
 /**

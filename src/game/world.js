@@ -10,8 +10,14 @@ import {
   CHUNK_SIZE,
 } from '../chunkManager.js';
 import { resolveCollisionAgainstTiles } from '../collision.js';
-import { generateBuilding, generateTree } from '../generators.js';
-import { generateShop, generateWell, generateWarehouse } from '../buildingVariants.js';
+import { generateBuilding, generateTree, generateSpecialTree } from '../generators.js';
+import {
+  generateShop,
+  generateWell,
+  generateWarehouse,
+  generateWindmill,
+  generateRuins,
+} from '../buildingVariants.js';
 import { generateBed, generateTable, generateChair, generateFireplace } from '../furniture.js';
 import {
   generateFence,
@@ -19,6 +25,7 @@ import {
   generateBench,
   generateFlowerbed,
   generateSignpost,
+  generateStatue,
 } from '../decorations.js';
 import { generateRoad, computeRoadConnections } from '../road.js';
 import { generateWater } from '../water.js';
@@ -38,7 +45,10 @@ const PROCEDURAL_GENERATORS = {
   shop: { generate: generateShop, salt: 600000 },
   well: { generate: generateWell, salt: 700000 },
   warehouse: { generate: generateWarehouse, salt: 800000 },
+  windmill: { generate: generateWindmill, salt: 1900000 },
   tree: { generate: (seed, pos, opts) => generateTree(seed, undefined, pos, opts), salt: 500000 },
+  specialTree: { generate: generateSpecialTree, salt: 2000000 },
+  ruins: { generate: generateRuins, salt: 2100000 },
   bed: { generate: generateBed, salt: 900000 },
   table: { generate: generateTable, salt: 1000000 },
   chair: { generate: generateChair, salt: 1100000 },
@@ -48,25 +58,34 @@ const PROCEDURAL_GENERATORS = {
   bench: { generate: generateBench, salt: 1500000 },
   flowerbed: { generate: generateFlowerbed, salt: 1600000 },
   signpost: { generate: generateSignpost, salt: 1700000 },
+  statue: { generate: generateStatue, salt: 1800000 },
 };
 
-export const BUILDING_TYPES = new Set(['house', 'shop', 'well', 'warehouse']);
+export const BUILDING_TYPES = new Set(['house', 'shop', 'well', 'warehouse', 'windmill']);
 export const FURNITURE_TYPES = new Set(['bed', 'table', 'chair', 'fireplace']);
+export const DECORATION_TYPES = new Set(['fence', 'streetlamp', 'bench', 'flowerbed', 'signpost', 'statue']);
 
-// 建物数・木の数は毎回全タイルを舐めて数え直すのではなく、
-// タイル種別が変わった瞬間に増減させるインクリメンタルなカウンターで管理する
-// （チャンクが増えても集計コストが増えないようにするため）。
-let liveBuildingCount = 0;
+// 建物数・木の数・装飾数・建物の種類ごとの内訳は毎回全タイルを舐めて数え直す
+// のではなく、タイル種別が変わった瞬間に増減させるインクリメンタルな
+// カウンターで管理する（チャンクが増えても集計コストが増えないようにするため）。
 let liveTreeCount = 0;
+let liveDecorationCount = 0;
+const liveBuildingTypeCounts = new Map(); // type -> count（house/shop/well/warehouse/windmill）
 
 function trackTileTypeAdded(type) {
-  if (BUILDING_TYPES.has(type)) liveBuildingCount += 1;
-  if (type === 'tree') liveTreeCount += 1;
+  if (BUILDING_TYPES.has(type)) {
+    liveBuildingTypeCounts.set(type, (liveBuildingTypeCounts.get(type) ?? 0) + 1);
+  }
+  if (type === 'tree' || type === 'specialTree') liveTreeCount += 1;
+  if (DECORATION_TYPES.has(type)) liveDecorationCount += 1;
 }
 
 function trackTileTypeRemoved(type) {
-  if (BUILDING_TYPES.has(type)) liveBuildingCount -= 1;
-  if (type === 'tree') liveTreeCount -= 1;
+  if (BUILDING_TYPES.has(type)) {
+    liveBuildingTypeCounts.set(type, (liveBuildingTypeCounts.get(type) ?? 0) - 1);
+  }
+  if (type === 'tree' || type === 'specialTree') liveTreeCount -= 1;
+  if (DECORATION_TYPES.has(type)) liveDecorationCount -= 1;
 }
 
 // ベッド・木・お店が置かれているタイル（屋内外どちらも）を追跡し、
@@ -83,7 +102,7 @@ function trackInteractiveTile(tile, type) {
   shopTiles.delete(tile);
   waterTiles.delete(tile);
   if (type === 'bed') bedTiles.add(tile);
-  else if (type === 'tree') treeTiles.add(tile);
+  else if (type === 'tree' || type === 'specialTree') treeTiles.add(tile);
   else if (type === 'shop') shopTiles.add(tile);
   else if (type === 'water') waterTiles.add(tile);
 }
@@ -213,9 +232,24 @@ export function buildOnTile(tile, type, { animate = true } = {}) {
   getNeighborTiles(tile).forEach(refreshRoadTile);
 }
 
+const LANDMARK_TYPES = new Set(['ruins', 'specialTree']);
+let landmarkDiscoveredHandler = null;
+
+/**
+ * ランドマーク（廃墟・特殊な木）が自然生成されたときに通知するハンドラーを
+ * 登録する。チャンクはキャラの周囲だけに生成されるため、生成イベント＝
+ * プレイヤーがその場所を「発見した」タイミングとみなせる。
+ */
+export function setLandmarkDiscoveredHandler(handler) {
+  landmarkDiscoveredHandler = handler;
+}
+
 // 自然生成でタイルに木などが配置されたときに呼ばれる（ポップアップ演出なし）
 function handleProceduralTile(tile, type) {
   buildOnTile(tile, type, { animate: false });
+  if (LANDMARK_TYPES.has(type)) {
+    landmarkDiscoveredHandler?.(type);
+  }
 }
 
 /**
@@ -335,10 +369,21 @@ export function getTownStats() {
   // 全タイルを舐めるO(n)処理ではなく、チャンク数からの計算とインクリメンタルな
   // カウンターだけで求める（探索が進んでも集計コストが増えない）。
   const chunkCount = getLoadedChunkCount();
+  let buildingCount = 0;
+  let distinctBuildingTypeCount = 0;
+  const buildingTypeCounts = {};
+  liveBuildingTypeCounts.forEach((count, type) => {
+    buildingTypeCounts[type] = count;
+    buildingCount += count;
+    if (count > 0) distinctBuildingTypeCount += 1;
+  });
   return {
     tileCount: chunkCount * CHUNK_SIZE * CHUNK_SIZE,
-    buildingCount: liveBuildingCount,
+    buildingCount,
     treeCount: liveTreeCount,
+    decorationCount: liveDecorationCount,
+    distinctBuildingTypeCount,
+    buildingTypeCounts,
     chunkCount,
   };
 }

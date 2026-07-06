@@ -10,6 +10,7 @@ import {
   trySpendMoney,
   addMoney,
   trySpendWood,
+  getTotalWoodCollected,
 } from './economy.js';
 
 beforeEach(() => {
@@ -81,5 +82,15 @@ describe('addWood / trySpendWood / addMoney / trySpendMoney', () => {
     expect(getMoney()).toBe(0);
     expect(trySpendMoney(1)).toBe(false);
     expect(getMoney()).toBe(0);
+  });
+});
+
+describe('getTotalWoodCollected（フェーズ19: 実績「木材を100集めた」用の累計カウンター）', () => {
+  test('addWoodするたびに増え続け、所持数を使っても減らない', () => {
+    const before = getTotalWoodCollected();
+    addWood(7);
+    expect(getTotalWoodCollected()).toBe(before + 7);
+    trySpendWood(7);
+    expect(getTotalWoodCollected()).toBe(before + 7); // 所持数は減るが累計は変わらない
   });
 });

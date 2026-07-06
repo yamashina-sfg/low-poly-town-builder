@@ -319,3 +319,33 @@ canvas {
 .build-menu button[data-type]:hover {
   background: #ffffff;
 }
+
+.build-menu button[data-type].locked {
+  background: rgba(255, 255, 255, 0.35);
+  color: rgba(34, 51, 34, 0.6);
+  cursor: not-allowed;
+}
+
+.build-menu button[data-type].locked:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.reputation-panel {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  padding: 6px 16px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+  border-radius: 6px;
+  text-align: center;
+}
+
+#reputation-score {
+  font-family: monospace;
+  opacity: 0.85;
+}

@@ -9,6 +9,11 @@ import {
   WELL_STONE_COLORS,
   WAREHOUSE_WALL_COLORS,
   WOOD_COLOR,
+  WINDMILL_TOWER_COLOR,
+  WINDMILL_BLADE_COLOR,
+  WINDMILL_ROOF_COLOR,
+  RUINS_COLOR,
+  RUINS_MOSS_COLOR,
 } from './palette.js';
 
 const FLOOR_HEIGHT = 0.7;
@@ -136,6 +141,93 @@ export function generateWarehouse(seed, tilePosition, { animate = true } = {}) {
       { animate },
     ),
   );
+
+  return { kind: 'instances', parts };
+}
+
+/**
+ * 風車：円柱の塔＋三角屋根＋十字に組んだ4枚の羽根。
+ * フェーズ19で「町の評判」が一定値に達すると解放される建物。
+ */
+export function generateWindmill(seed, tilePosition, { animate = true } = {}) {
+  const parts = [];
+  const towerColor = new THREE.Color(WINDMILL_TOWER_COLOR);
+  const towerHeight = 1.6;
+
+  parts.push(
+    addInstance(
+      UNIT_CYLINDER_POOL,
+      new THREE.Vector3(tilePosition.x, 0, tilePosition.z),
+      ZERO_ROTATION,
+      new THREE.Vector3(0.45, towerHeight, 0.45),
+      towerColor,
+      { animate },
+    ),
+  );
+
+  const roofColor = new THREE.Color(WINDMILL_ROOF_COLOR);
+  parts.push(
+    addInstance(
+      UNIT_CONE_SQUARE_POOL,
+      new THREE.Vector3(tilePosition.x, towerHeight, tilePosition.z),
+      new THREE.Euler(0, Math.PI / 4, 0),
+      new THREE.Vector3(0.5, 0.5, 0.5),
+      roofColor,
+      { animate },
+    ),
+  );
+
+  const bladeColor = new THREE.Color(WINDMILL_BLADE_COLOR);
+  const bladeCenter = new THREE.Vector3(tilePosition.x, towerHeight * 0.85, tilePosition.z + 0.5);
+  [0, Math.PI / 2, Math.PI, (Math.PI * 3) / 2].forEach((angle) => {
+    parts.push(
+      addInstance(
+        UNIT_BOX_POOL,
+        bladeCenter,
+        new THREE.Euler(0, 0, angle),
+        new THREE.Vector3(0.12, 0.9, 0.04),
+        bladeColor,
+        { animate },
+      ),
+    );
+  });
+
+  return { kind: 'instances', parts };
+}
+
+/**
+ * 廃墟：拠点から離れた場所に低確率で自然生成されるランドマーク。
+ * 崩れかけた壁の断片＋苔むした瓦礫で構成する（プレイヤーは建築できない）。
+ */
+export function generateRuins(seed, tilePosition, { animate = true } = {}) {
+  const rng = mulberry32(seed);
+  const parts = [];
+  const stoneColor = new THREE.Color(RUINS_COLOR);
+  const mossColor = new THREE.Color(RUINS_MOSS_COLOR);
+
+  // 崩れた壁の断片を数枚、高さ・傾きをばらつかせて配置する
+  const fragmentCount = 3 + Math.floor(rng() * 2);
+  for (let i = 0; i < fragmentCount; i += 1) {
+    const angle = (i / fragmentCount) * Math.PI * 2 + rng() * 0.6;
+    const distance = 0.35 + rng() * 0.3;
+    const height = 0.4 + rng() * 0.5;
+    const tilt = (rng() - 0.5) * 0.3;
+    const color = rng() < 0.5 ? stoneColor : mossColor;
+    parts.push(
+      addInstance(
+        UNIT_BOX_POOL,
+        new THREE.Vector3(
+          tilePosition.x + Math.cos(angle) * distance,
+          0,
+          tilePosition.z + Math.sin(angle) * distance,
+        ),
+        new THREE.Euler(tilt, angle, 0),
+        new THREE.Vector3(0.5, height, 0.15),
+        color,
+        { animate },
+      ),
+    );
+  }
 
   return { kind: 'instances', parts };
 }

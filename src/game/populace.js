@@ -64,6 +64,17 @@ export function initPopulace(scene) {
 }
 
 /**
+ * 現在のNPC・犬の数（「町の評判」スコアの人口要素として使う）。
+ */
+export function getNpcCount() {
+  return npcs.length;
+}
+
+export function getDogCount() {
+  return dogs.length;
+}
+
+/**
  * NPC・犬・鳥の徘徊アニメーションを進め、建物や木にぶつからないようにする
  * （屋外専用、常に屋外にいるためプレイヤーの室内外モードに関係なく毎フレーム呼ぶ）。
  */

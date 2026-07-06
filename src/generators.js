@@ -15,6 +15,8 @@ import {
   TRUNK_COLOR,
   TREE_CONIFER_COLORS,
   TREE_BROADLEAF_COLORS,
+  SPECIAL_TREE_TRUNK_COLOR,
+  SPECIAL_TREE_LEAF_COLOR,
 } from './palette.js';
 
 const FLOOR_HEIGHT = 0.7;
@@ -113,6 +115,50 @@ export function generateTree(seed, type, tilePosition, { animate = true } = {}) 
       const scale = new THREE.Vector3(radius, radius, radius);
       parts.push(addInstance(UNIT_SPHERE_POOL, position, ZERO_ROTATION, scale, color, { animate }));
     }
+  }
+
+  return { kind: 'instances', parts };
+}
+
+/**
+ * 特殊な木：拠点から離れた場所に低確率で自然生成される、資源が豊富な巨木。
+ * 通常の広葉樹より一回り大きく、金色がかった葉が特徴（伐採時に木材を多く得られる）。
+ * @returns {{ kind: 'instances', parts: Array<{key: string, index: number}> }}
+ */
+export function generateSpecialTree(seed, tilePosition, { animate = true } = {}) {
+  const rng = mulberry32(seed);
+  const parts = [];
+
+  const trunkHeight = 1.0 + rng() * 0.3;
+  const trunkColor = new THREE.Color(SPECIAL_TREE_TRUNK_COLOR);
+  const trunkPosition = new THREE.Vector3(tilePosition.x, 0, tilePosition.z);
+  const trunkScale = new THREE.Vector3(1.6, trunkHeight, 1.6);
+  parts.push(addInstance(UNIT_TRUNK_POOL, trunkPosition, ZERO_ROTATION, trunkScale, trunkColor, { animate }));
+
+  const blobCount = 5 + Math.floor(rng() * 3); // 5〜7個の大ぶりな葉の房
+  for (let i = 0; i < blobCount; i++) {
+    const radius = 0.5 + rng() * 0.2;
+    const offsetX = (rng() - 0.5) * 0.9;
+    const offsetZ = (rng() - 0.5) * 0.9;
+    const offsetY = rng() * 0.6;
+    const position = new THREE.Vector3(
+      tilePosition.x + offsetX,
+      trunkHeight + 0.3 + offsetY,
+      tilePosition.z + offsetZ,
+    );
+    const scale = new THREE.Vector3(radius, radius, radius);
+    parts.push(
+      addInstance(
+        UNIT_SPHERE_POOL,
+        position,
+        ZERO_ROTATION,
+        scale,
+        new THREE.Color(SPECIAL_TREE_LEAF_COLOR),
+        {
+          animate,
+        },
+      ),
+    );
   }
 
   return { kind: 'instances', parts };
