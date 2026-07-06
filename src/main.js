@@ -35,6 +35,8 @@ import { advanceSleepiness, resetSleepiness, getSleepiness } from './playerStatu
 import { getWood, getMoney, canAfford, pay, addWood, trySpendMoney, trySpendWood, addMoney } from './economy.js';
 import { saveTownToLocalStorage, loadTownFromLocalStorage } from './save.js';
 import { createCharacter } from './character.js';
+import { createNPC } from './npc.js';
+import { createBird, createDog } from './creatures.js';
 import { updateDayNightCycle } from './dayNightCycle.js';
 import { startAmbientAudio, setAmbientMuted } from './ambientAudio.js';
 import {
@@ -180,6 +182,53 @@ scene.add(character);
 
 // キャラの向き（Y軸回転）を角度で保持し、毎フレーム滑らかに補間する
 let characterFacing = 0;
+
+// ------------------------------------------------------------------
+// NPC・小動物：プレイヤーと同じ生成ロジックを色違いで流用し、
+// 決まった範囲をゆっくり徘徊するだけのシンプルな挙動
+// ------------------------------------------------------------------
+const NPC_CLOTHING_COLORS = [0xc94c4c, 0x4c7ac9, 0xc9a94c, 0x4cae7a, 0x8a5fd9, 0xe07a9a];
+const NPC_HAT_COLORS = [0x5c5c5c, 0x7a4a3a, 0x3f6b3a, 0x455a64];
+
+const npcs = [];
+for (let i = 0; i < 6; i += 1) {
+  const angle = (i / 6) * Math.PI * 2;
+  const homeDistance = 8 + Math.random() * 10;
+  const npc = createNPC({
+    homeX: Math.cos(angle) * homeDistance,
+    homeZ: Math.sin(angle) * homeDistance,
+    clothingColor: NPC_CLOTHING_COLORS[i % NPC_CLOTHING_COLORS.length],
+    hatColor: NPC_HAT_COLORS[i % NPC_HAT_COLORS.length],
+    radius: 4 + Math.random() * 2,
+    speed: 1 + Math.random() * 0.6,
+  });
+  scene.add(npc.group);
+  npcs.push(npc);
+}
+
+const birds = [];
+for (let i = 0; i < 3; i += 1) {
+  const bird = createBird({
+    centerX: (Math.random() - 0.5) * 20,
+    centerZ: (Math.random() - 0.5) * 20,
+    height: 5 + Math.random() * 2,
+    radius: 3 + Math.random() * 3,
+    speed: 0.5 + Math.random() * 0.4,
+  });
+  scene.add(bird.group);
+  birds.push(bird);
+}
+
+const dogs = [];
+for (let i = 0; i < 2; i += 1) {
+  const dog = createDog({
+    homeX: (Math.random() - 0.5) * 16,
+    homeZ: (Math.random() - 0.5) * 16,
+    radius: 3 + Math.random() * 2,
+  });
+  scene.add(dog.group);
+  dogs.push(dog);
+}
 
 // ------------------------------------------------------------------
 // 入力
@@ -709,6 +758,10 @@ function animate() {
     character.rotation.y = characterFacing;
   }
   characterController.updateWalkAnimation(isMoving, delta);
+
+  npcs.forEach((npc) => npc.update(delta));
+  dogs.forEach((dog) => dog.update(delta));
+  birds.forEach((bird) => bird.update(clock.elapsedTime));
 
   if (indoorMode) {
     // 室内では部屋の範囲内にキャラを収める（チャンクの生成・可視化更新は行わない）
