@@ -9,7 +9,6 @@ const MOVE_SPEED = 5; // units / sec
 // 回転する「その場旋回」方式（W/Sは現在向いている方向への前進/後退のみを
 // 行い、A/Dの旋回とは独立している）。
 const TURN_SPEED = 4.2; // rad / sec（180度を約0.75秒で回りきる速さ）
-const CAMERA_SMOOTHING = 4; // 大きいほど素早くカメラが追従する
 const FOOTSTEP_INTERVAL = 0.35;
 
 // Z成分は負（キャラの進行方向=forwardの逆側）にすることで、
@@ -28,7 +27,6 @@ let characterFacing = 0;
 let cameraRef = null;
 const cameraCurrentPosition = new THREE.Vector3();
 const moveDirection = new THREE.Vector3();
-const desiredCameraPosition = new THREE.Vector3();
 let footstepTimer = 0;
 
 /**
@@ -49,6 +47,21 @@ export function initPlayer(scene, camera, { clothingColor, hatColor } = {}) {
   });
   window.addEventListener('keyup', (e) => {
     keys[e.code] = false;
+  });
+
+  // ウィンドウのフォーカスが外れる（alt-tabや他要素のクリック等）と、ブラウザが
+  // keyupイベントを配信しないまま既存のkeydown状態だけが残ることがある。
+  // これを放置すると、キーを離したはずなのに押されっぱなし判定のまま
+  // 回転・移動し続けてしまうため、フォーカスを失った時点で全キーの
+  // 押下状態をリセットする。
+  function resetAllKeys() {
+    Object.keys(keys).forEach((code) => {
+      keys[code] = false;
+    });
+  }
+  window.addEventListener('blur', resetAllKeys);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) resetAllKeys();
   });
 }
 
@@ -141,10 +154,15 @@ export function updateMovementInput(delta) {
 }
 
 /**
- * テレポート（入室・退室）直後にカメラが古い位置から緩やかに追従してしまい
- * 何も見えない空白フレームが出ないよう、カメラを即座にキャラの背後へスナップする。
+ * キャラの向きに応じた斜め後ろ上空の位置へ、カメラを即座に配置する
+ * （室内では近め）。characterFacingは既にA/D入力で毎フレーム正しい値に
+ * 更新されているため、ここで指数スムージングによる遅延を挟むと、
+ * 旋回中にカメラの向きがキャラの向きに対して大きく（実測で30〜45度ほど）
+ * 遅れて「向きがズレて見える」原因になっていた。カメラはキャラの向きに
+ * 常に完全追従させ、テレポート時のスナップ（後方互換のため関数として残す）
+ * と全く同じ計算にする。
  */
-export function snapCameraToCharacter(indoorMode) {
+function positionCameraBehindCharacter(indoorMode) {
   const offset = indoorMode ? INDOOR_CAMERA_OFFSET : CAMERA_OFFSET;
   const rotatedOffset = offset.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), characterFacing);
   cameraCurrentPosition.copy(character.position).add(rotatedOffset);
@@ -153,17 +171,16 @@ export function snapCameraToCharacter(indoorMode) {
 }
 
 /**
- * カメラをキャラの向きに応じて斜め後ろ上空に滑らかに追従させる（室内では近め）。
+ * テレポート（入室・退室）直後にカメラが古い位置から追従してしまい
+ * 何も見えない空白フレームが出ないよう、カメラを即座にキャラの背後へスナップする。
  */
-export function updateCameraFollow(indoorMode, delta) {
-  const activeCameraOffset = indoorMode ? INDOOR_CAMERA_OFFSET : CAMERA_OFFSET;
-  const rotatedOffset = activeCameraOffset
-    .clone()
-    .applyAxisAngle(new THREE.Vector3(0, 1, 0), characterFacing);
-  desiredCameraPosition.copy(character.position).add(rotatedOffset);
-  cameraCurrentPosition.lerp(desiredCameraPosition, 1 - Math.exp(-CAMERA_SMOOTHING * delta));
-  cameraRef.position.copy(cameraCurrentPosition);
+export function snapCameraToCharacter(indoorMode) {
+  positionCameraBehindCharacter(indoorMode);
+}
 
-  const lookTarget = character.position.clone().add(new THREE.Vector3(0, 1, 0));
-  cameraRef.lookAt(lookTarget);
+/**
+ * カメラをキャラの向きに追従させる（毎フレーム呼ぶ）。
+ */
+export function updateCameraFollow(indoorMode) {
+  positionCameraBehindCharacter(indoorMode);
 }

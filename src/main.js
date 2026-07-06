@@ -331,7 +331,7 @@ function animate() {
     resolvePopulaceInterCollisions(characterPosition, PLAYER_COLLISION_RADIUS);
   }
 
-  updateCameraFollow(isIndoorMode(), delta);
+  updateCameraFollow(isIndoorMode());
 
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
