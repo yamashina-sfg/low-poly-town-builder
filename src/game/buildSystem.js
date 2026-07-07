@@ -10,7 +10,9 @@ import {
   buildOnTile,
   buildOnIndoorTile,
   isTilePlaceable,
+  isStructureTile,
   moveTileContent,
+  removeTileContent,
 } from './world.js';
 import { getCurrentLockedTypes } from './progression.js';
 import { showStatusMessage } from './statusMessage.js';
@@ -361,18 +363,20 @@ function handleClick(event) {
     return;
   }
 
-  if (tile.userData.tileType === 'grass') {
-    showBuildMenu(event.clientX, event.clientY, (type) => {
-      if (getCurrentLockedTypes().includes(type)) {
-        showStatusMessage('まだ解放されていません');
-        return;
-      }
-      beginNewBuildPreview(type);
-    });
+  if (isStructureTile(tile)) {
+    openContextMenu(tile, event.clientX, event.clientY);
     return;
   }
 
-  openContextMenu(tile, event.clientX, event.clientY);
+  // 地形系（更地・木・道・水・橋など）は、これまで通りクリックで建築メニューが
+  // 開き、上書きできる（水タイルに橋を架ける操作もここを通る）。
+  showBuildMenu(event.clientX, event.clientY, (type) => {
+    if (getCurrentLockedTypes().includes(type)) {
+      showStatusMessage('まだ解放されていません');
+      return;
+    }
+    beginNewBuildPreview(type);
+  });
 }
 
 function handleContextMenuEvent(event) {
@@ -436,7 +440,7 @@ export function initBuildSystem({ scene, renderer, camera, onEnterHouse }) {
     if (!contextMenuTile) return;
     const tile = contextMenuTile;
     closeContextMenu();
-    buildOnTile(tile, 'clear');
+    removeTileContent(tile);
     showStatusMessage('撤去しました');
   });
   contextCancelBtn.addEventListener('click', () => closeContextMenu());
@@ -444,7 +448,7 @@ export function initBuildSystem({ scene, renderer, camera, onEnterHouse }) {
   rangeSelectToggleBtn.addEventListener('click', () => setRangeSelectMode(!rangeSelectMode));
   rangeSelectYesBtn.addEventListener('click', () => {
     const count = rangeSelectPendingTiles.length;
-    rangeSelectPendingTiles.forEach((tile) => buildOnTile(tile, 'clear'));
+    rangeSelectPendingTiles.forEach((tile) => removeTileContent(tile));
     clearRangeSelectPending();
     showStatusMessage(`${count}個のタイルを撤去しました`);
   });

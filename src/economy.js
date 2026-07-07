@@ -21,6 +21,11 @@ export const BUILD_COSTS = {
   flowerbed: { wood: 0, money: 5 },
   signpost: { wood: 4, money: 0 },
   statue: { wood: 5, money: 40 },
+  // 通常の道(road)は無料（従来通り）。土の道はさらに手軽、石畳・橋は
+  // 少し立派な分コストをかける（フェーズ22：道の拡充）。
+  dirtRoad: { wood: 1, money: 0 },
+  cobblestone: { wood: 2, money: 5 },
+  bridge: { wood: 10, money: 20 },
 };
 
 export function getWood() {

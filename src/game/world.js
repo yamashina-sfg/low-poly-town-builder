@@ -27,7 +27,7 @@ import {
   generateSignpost,
   generateStatue,
 } from '../decorations.js';
-import { generateRoad, computeRoadConnections } from '../road.js';
+import { generateRoad, computeRoadConnections, ROAD_TYPES } from '../road.js';
 import { generateWater } from '../water.js';
 import { removeInstance } from '../instancing.js';
 import { getWood, getMoney, setResources } from '../economy.js';
@@ -68,16 +68,43 @@ export const DECORATION_TYPES = new Set(['fence', 'streetlamp', 'bench', 'flower
 // 設置できない（フェーズ21：建築プレビューの重なりチェック）。木・道路・水・
 // 更地に戻すといった地形系の変更は、これまで通り上書きを許可する。
 const STRUCTURE_TYPES = new Set([...BUILDING_TYPES, ...DECORATION_TYPES]);
+// フェーズ22：橋は水の上にだけ架けられる。逆に、橋以外の道（土の道・石畳・
+// 通常の道）は水タイルには敷けない（水を渡すには橋を使う必要がある）。
+const WATER_ONLY_TYPES = new Set(['bridge']);
+const LAND_ROAD_TYPES = new Set(['road', 'dirtRoad', 'cobblestone']);
 
 /**
  * type種類のオブジェクトをtileに設置できるか（重なりチェック）。
- * 地形系の種類は常に設置可能（上書き）。建物・装飾は、対象タイルが
- * 更地(grass)のときだけ設置できる。
+ * - 橋は水タイルにしか架けられない
+ * - 橋以外の道は水タイルには敷けない
+ * - 建物・装飾は、対象タイルが更地(grass)のときだけ設置できる
+ * - それ以外の地形系（木・水・更地に戻す等）は常に設置可能（上書き）
  */
 export function isTilePlaceable(tile, type) {
   if (!tile) return false;
+  if (WATER_ONLY_TYPES.has(type)) return tile.userData.tileType === 'water';
+  if (LAND_ROAD_TYPES.has(type) && tile.userData.tileType === 'water') return false;
   if (!STRUCTURE_TYPES.has(type)) return true;
   return tile.userData.tileType === 'grass';
+}
+
+/**
+ * tileに現在置かれているのが「建物・装飾」（フェーズ21の移動/撤去メニューの
+ * 対象）かどうか。地形系（木・道・水・橋など）はここではfalseになり、
+ * クリックすると（移動/撤去メニューではなく）建築メニューが開いて
+ * 上書きできる＝地形の塗り直しや、水タイルに橋を架ける操作が可能になる。
+ */
+export function isStructureTile(tile) {
+  return !!tile && STRUCTURE_TYPES.has(tile.userData.tileType);
+}
+
+/**
+ * tileが（4方向のいずれかで）道に隣接しているか。フェーズ22：経済システムと
+ * 連携するための土台として、建物が道に接続されているかを判定できるようにする。
+ */
+export function isConnectedToRoad(tile) {
+  if (!tile) return false;
+  return getNeighborTiles(tile).some((neighbor) => ROAD_TYPES.has(neighbor.userData.tileType));
 }
 
 // 建物数・木の数・装飾数・建物の種類ごとの内訳は毎回全タイルを舐めて数え直す
@@ -103,11 +130,13 @@ function trackTileTypeRemoved(type) {
   if (DECORATION_TYPES.has(type)) liveDecorationCount -= 1;
 }
 
-// ベッド・木・お店が置かれているタイル（屋内外どちらも）を追跡し、
-// キャラが近づいたときに「眠る/伐採する/お店を開く」操作を出せるようにする。
+// ベッド・木・お店・住居が置かれているタイル（屋内外どちらも）を追跡し、
+// キャラが近づいたときに「眠る/伐採する/お店を開く」操作を出せるようにしたり
+// （フェーズ22）NPCの家・勤務先の割り当てに使ったりする。
 const bedTiles = new Set();
 const treeTiles = new Set();
 const shopTiles = new Set();
+const houseTiles = new Set();
 // 水面のきらめきパーティクルをたまに出すための水タイル一覧
 const waterTiles = new Set();
 
@@ -116,10 +145,12 @@ function trackInteractiveTile(tile, type) {
   treeTiles.delete(tile);
   shopTiles.delete(tile);
   waterTiles.delete(tile);
+  houseTiles.delete(tile);
   if (type === 'bed') bedTiles.add(tile);
   else if (type === 'tree' || type === 'specialTree') treeTiles.add(tile);
   else if (type === 'shop') shopTiles.add(tile);
   else if (type === 'water') waterTiles.add(tile);
+  else if (type === 'house') houseTiles.add(tile);
 }
 
 export function getBedTiles() {
@@ -133,6 +164,9 @@ export function getShopTiles() {
 }
 export function getWaterTiles() {
   return waterTiles;
+}
+export function getHouseTiles() {
+  return houseTiles;
 }
 
 let sceneRef = null;
@@ -237,9 +271,9 @@ export function buildOnTile(tile, type, { animate = true, rotationY = 0 } = {}) 
     const object3D = generateWater(tile.position, TILE_SIZE, { animate });
     sceneRef.add(object3D);
     tile.userData.object = { kind: 'mesh', object3D };
-  } else if (type === 'road') {
+  } else if (ROAD_TYPES.has(type)) {
     const connections = computeRoadConnections(getGlobalTile, globalX, globalY);
-    tile.userData.object = generateRoad(tile.position, connections, { animate });
+    tile.userData.object = generateRoad(tile.position, connections, { animate, type });
   }
 
   trackInteractiveTile(tile, type);
@@ -249,14 +283,32 @@ export function buildOnTile(tile, type, { animate = true, rotationY = 0 } = {}) 
 }
 
 /**
+ * タイルの中身を取り除いた後、下地として何に戻すべきかを返す。
+ * 橋は元々水タイルの上に架けたものなので、撤去・移動元の後始末では
+ * 更地(grass)ではなく水(water)に戻す（フェーズ22）。
+ */
+function getVacatedType(tileType) {
+  return tileType === 'bridge' ? 'water' : 'clear';
+}
+
+/**
+ * 設置済みの建物・装飾・道を撤去する（フェーズ21：撤去メニュー／範囲選択）。
+ * 橋を撤去した場合は水タイルに戻る。
+ */
+export function removeTileContent(tile) {
+  buildOnTile(tile, getVacatedType(tile.userData.tileType));
+}
+
+/**
  * 設置済みの建物・装飾を別のタイルへ移動する（フェーズ21：移動メニュー）。
  * 住居の場合は室内の家具レイアウトも引き継ぐ。rotationYOverrideを渡すと、
  * 移動と同時に向きも変更できる（省略時は元の向きを引き継ぐ）。
+ * 移動元が橋だった場合は、そこは水タイルに戻る（フェーズ22）。
  */
 export function moveTileContent(fromTile, toTile, rotationYOverride) {
   const { tileType, rotationY, indoorFurniture } = fromTile.userData;
   const finalRotationY = rotationYOverride ?? rotationY ?? 0;
-  buildOnTile(fromTile, 'clear');
+  buildOnTile(fromTile, getVacatedType(tileType));
   buildOnTile(toTile, tileType, { rotationY: finalRotationY });
   if (tileType === 'house' && Array.isArray(indoorFurniture)) {
     toTile.userData.indoorFurniture = indoorFurniture.slice();
@@ -301,6 +353,10 @@ function handleRestoreTile(tile, type, furniture, rotationY = 0) {
  */
 function handleTileDispose(tile) {
   trackTileTypeRemoved(tile.userData.tileType);
+  // アンロード時にインタラクティブタイル集合（ベッド/木/お店/住居/水）からも
+  // 取り除いておかないと、古いタイル参照がSetに残り続けてしまう
+  // （フェーズ22：NPCの家・勤務先割り当てで参照するため、特に重要になった）。
+  trackInteractiveTile(tile, null);
   clearTileObject(tile);
 }
 

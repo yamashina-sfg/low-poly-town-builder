@@ -26,6 +26,9 @@ const PREVIEW_FOOTPRINTS = {
   fireplace: { width: 0.9, height: 1.4, depth: 0.5 },
   tree: { width: 0.9, height: 1.3, depth: 0.9 },
   road: { width: TILE_SIZE, height: 0.05, depth: TILE_SIZE },
+  dirtRoad: { width: TILE_SIZE, height: 0.05, depth: TILE_SIZE },
+  cobblestone: { width: TILE_SIZE, height: 0.05, depth: TILE_SIZE },
+  bridge: { width: TILE_SIZE, height: 0.3, depth: TILE_SIZE },
   water: { width: TILE_SIZE, height: 0.05, depth: TILE_SIZE },
   clear: { width: TILE_SIZE, height: 0.05, depth: TILE_SIZE },
 };
