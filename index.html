@@ -17,7 +17,9 @@
         <h2>ようこそ、ローポリタウンビルダーへ</h2>
         <ul>
           <li><strong>WASD / 矢印キー</strong>：移動</li>
-          <li><strong>クリック</strong>：タイルを選んで建築</li>
+          <li><strong>クリック</strong>：タイルを選んで建築（プレビュー表示）</li>
+          <li><strong>Rキー</strong>：建築プレビューを回転</li>
+          <li><strong>Esc / 右クリック</strong>：建築をキャンセル</li>
           <li><strong>Eキー</strong>：ベッド・木・お店などを操作</li>
           <li><strong>Escキー</strong>：住居の外に出る</li>
         </ul>
@@ -114,6 +116,21 @@
         <button type="button" data-type="water">水</button>
         <button type="button" data-type="clear">更地に戻す</button>
       </div>
+    </div>
+    <div id="build-preview-cost" class="build-preview-cost hidden"></div>
+    <div id="tile-context-menu" class="tile-context-menu hidden">
+      <button type="button" id="context-enter" class="hidden">入る</button>
+      <button type="button" id="context-move">移動</button>
+      <button type="button" id="context-remove">撤去</button>
+      <button type="button" id="context-cancel">キャンセル</button>
+    </div>
+    <button type="button" id="range-select-toggle" class="range-select-toggle" title="範囲選択して一括撤去">
+      範囲選択
+    </button>
+    <div id="range-select-confirm" class="range-select-confirm hidden">
+      <span id="range-select-count">0</span>個のタイルを撤去しますか？
+      <button type="button" id="range-select-yes">撤去する</button>
+      <button type="button" id="range-select-no">キャンセル</button>
     </div>
     <script type="module" src="/src/main.js"></script>
   </body>

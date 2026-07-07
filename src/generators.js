@@ -8,6 +8,7 @@ import {
   UNIT_TRUNK_POOL,
   UNIT_SPHERE_POOL,
   ZERO_ROTATION,
+  rotatedEuler,
 } from './primitives.js';
 import {
   BUILDING_WALL_COLORS,
@@ -31,7 +32,12 @@ function pick(rng, colors) {
  * 同じseedを渡せば常に同じ建物になる（決定論的）。
  * @returns {{ kind: 'instances', parts: Array<{key: string, index: number}> }}
  */
-export function generateBuilding(seed, _type = 'house', tilePosition, { animate = true } = {}) {
+export function generateBuilding(
+  seed,
+  _type = 'house',
+  tilePosition,
+  { animate = true, rotationY = 0 } = {},
+) {
   const rng = mulberry32(seed);
   const parts = [];
 
@@ -44,7 +50,7 @@ export function generateBuilding(seed, _type = 'house', tilePosition, { animate 
     const color = new THREE.Color(pick(rng, BUILDING_WALL_COLORS));
     const position = new THREE.Vector3(tilePosition.x, currentY, tilePosition.z);
     const scale = new THREE.Vector3(width, FLOOR_HEIGHT, width);
-    parts.push(addInstance(UNIT_BOX_POOL, position, ZERO_ROTATION, scale, color, { animate }));
+    parts.push(addInstance(UNIT_BOX_POOL, position, rotatedEuler(rotationY), scale, color, { animate }));
     currentY += FLOOR_HEIGHT;
     topWidth = width;
   }
@@ -55,13 +61,15 @@ export function generateBuilding(seed, _type = 'house', tilePosition, { animate 
   if (rng() < 0.5) {
     // 三角屋根
     const roofHeight = 0.8;
-    const rotation = new THREE.Euler(0, Math.PI / 4, 0);
+    const rotation = rotatedEuler(rotationY, 0, Math.PI / 4, 0);
     const scale = new THREE.Vector3(topWidth * 0.75, roofHeight, topWidth * 0.75);
     parts.push(addInstance(UNIT_CONE_SQUARE_POOL, roofPosition, rotation, scale, roofColor, { animate }));
   } else {
     // 平屋根
     const scale = new THREE.Vector3(topWidth * 1.05, 0.15, topWidth * 1.05);
-    parts.push(addInstance(UNIT_BOX_POOL, roofPosition, ZERO_ROTATION, scale, roofColor, { animate }));
+    parts.push(
+      addInstance(UNIT_BOX_POOL, roofPosition, rotatedEuler(rotationY), scale, roofColor, { animate }),
+    );
   }
 
   return { kind: 'instances', parts };

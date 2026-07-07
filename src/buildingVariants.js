@@ -1,7 +1,13 @@
 import * as THREE from 'three';
 import { mulberry32 } from './random.js';
 import { addInstance } from './instancing.js';
-import { UNIT_BOX_POOL, UNIT_CONE_SQUARE_POOL, UNIT_CYLINDER_POOL, ZERO_ROTATION } from './primitives.js';
+import {
+  UNIT_BOX_POOL,
+  UNIT_CONE_SQUARE_POOL,
+  UNIT_CYLINDER_POOL,
+  offsetPosition,
+  rotatedEuler,
+} from './primitives.js';
 import {
   BUILDING_ROOF_COLORS,
   SHOP_WALL_COLORS,
@@ -25,7 +31,7 @@ function pick(rng, colors) {
 /**
  * お店：1〜2階建て＋色鮮やかなオーニング（庇）＋平屋根。
  */
-export function generateShop(seed, tilePosition, { animate = true } = {}) {
+export function generateShop(seed, tilePosition, { animate = true, rotationY = 0 } = {}) {
   const rng = mulberry32(seed);
   const parts = [];
   const width = 1.3;
@@ -34,27 +40,27 @@ export function generateShop(seed, tilePosition, { animate = true } = {}) {
 
   for (let i = 0; i < floors; i++) {
     const color = new THREE.Color(pick(rng, SHOP_WALL_COLORS));
-    const position = new THREE.Vector3(tilePosition.x, currentY, tilePosition.z);
+    const position = offsetPosition(tilePosition, 0, currentY, 0, rotationY);
     const scale = new THREE.Vector3(width, FLOOR_HEIGHT, width);
-    parts.push(addInstance(UNIT_BOX_POOL, position, ZERO_ROTATION, scale, color, { animate }));
+    parts.push(addInstance(UNIT_BOX_POOL, position, rotatedEuler(rotationY), scale, color, { animate }));
     currentY += FLOOR_HEIGHT;
   }
 
   const awningColor = new THREE.Color(pick(rng, SHOP_AWNING_COLORS));
-  const awningPosition = new THREE.Vector3(
-    tilePosition.x,
-    FLOOR_HEIGHT * 0.85,
-    tilePosition.z + width * 0.55,
-  );
+  const awningPosition = offsetPosition(tilePosition, 0, FLOOR_HEIGHT * 0.85, width * 0.55, rotationY);
   const awningScale = new THREE.Vector3(width * 1.1, 0.08, width * 0.5);
   parts.push(
-    addInstance(UNIT_BOX_POOL, awningPosition, ZERO_ROTATION, awningScale, awningColor, { animate }),
+    addInstance(UNIT_BOX_POOL, awningPosition, rotatedEuler(rotationY), awningScale, awningColor, {
+      animate,
+    }),
   );
 
   const roofColor = new THREE.Color(pick(rng, BUILDING_ROOF_COLORS));
-  const roofPosition = new THREE.Vector3(tilePosition.x, currentY, tilePosition.z);
+  const roofPosition = offsetPosition(tilePosition, 0, currentY, 0, rotationY);
   const roofScale = new THREE.Vector3(width * 1.05, 0.15, width * 1.05);
-  parts.push(addInstance(UNIT_BOX_POOL, roofPosition, ZERO_ROTATION, roofScale, roofColor, { animate }));
+  parts.push(
+    addInstance(UNIT_BOX_POOL, roofPosition, rotatedEuler(rotationY), roofScale, roofColor, { animate }),
+  );
 
   return { kind: 'instances', parts };
 }
@@ -62,7 +68,7 @@ export function generateShop(seed, tilePosition, { animate = true } = {}) {
 /**
  * 井戸：石積みの土台＋木の支柱2本＋三角屋根。
  */
-export function generateWell(seed, tilePosition, { animate = true } = {}) {
+export function generateWell(seed, tilePosition, { animate = true, rotationY = 0 } = {}) {
   const rng = mulberry32(seed);
   const parts = [];
 
@@ -70,8 +76,8 @@ export function generateWell(seed, tilePosition, { animate = true } = {}) {
   parts.push(
     addInstance(
       UNIT_CYLINDER_POOL,
-      new THREE.Vector3(tilePosition.x, 0, tilePosition.z),
-      ZERO_ROTATION,
+      offsetPosition(tilePosition, 0, 0, 0, rotationY),
+      rotatedEuler(rotationY),
       new THREE.Vector3(0.5, 0.5, 0.5),
       stoneColor,
       { animate },
@@ -83,8 +89,8 @@ export function generateWell(seed, tilePosition, { animate = true } = {}) {
     parts.push(
       addInstance(
         UNIT_CYLINDER_POOL,
-        new THREE.Vector3(tilePosition.x + offset, 0.5, tilePosition.z),
-        ZERO_ROTATION,
+        offsetPosition(tilePosition, offset, 0.5, 0, rotationY),
+        rotatedEuler(rotationY),
         new THREE.Vector3(0.06, 0.6, 0.06),
         postColor,
         { animate },
@@ -96,8 +102,8 @@ export function generateWell(seed, tilePosition, { animate = true } = {}) {
   parts.push(
     addInstance(
       UNIT_CONE_SQUARE_POOL,
-      new THREE.Vector3(tilePosition.x, 1.1, tilePosition.z),
-      new THREE.Euler(0, Math.PI / 4, 0),
+      offsetPosition(tilePosition, 0, 1.1, 0, rotationY),
+      rotatedEuler(rotationY, 0, Math.PI / 4, 0),
       new THREE.Vector3(0.6, 0.4, 0.6),
       roofColor,
       { animate },
@@ -110,7 +116,7 @@ export function generateWell(seed, tilePosition, { animate = true } = {}) {
 /**
  * 倉庫：大きめの箱＋緩やかな片流れ屋根。実用的な配色。
  */
-export function generateWarehouse(seed, tilePosition, { animate = true } = {}) {
+export function generateWarehouse(seed, tilePosition, { animate = true, rotationY = 0 } = {}) {
   const rng = mulberry32(seed);
   const parts = [];
 
@@ -122,8 +128,8 @@ export function generateWarehouse(seed, tilePosition, { animate = true } = {}) {
   parts.push(
     addInstance(
       UNIT_BOX_POOL,
-      new THREE.Vector3(tilePosition.x, 0, tilePosition.z),
-      ZERO_ROTATION,
+      offsetPosition(tilePosition, 0, 0, 0, rotationY),
+      rotatedEuler(rotationY),
       new THREE.Vector3(width, height, depth),
       wallColor,
       { animate },
@@ -134,8 +140,8 @@ export function generateWarehouse(seed, tilePosition, { animate = true } = {}) {
   parts.push(
     addInstance(
       UNIT_BOX_POOL,
-      new THREE.Vector3(tilePosition.x, height, tilePosition.z),
-      ZERO_ROTATION,
+      offsetPosition(tilePosition, 0, height, 0, rotationY),
+      rotatedEuler(rotationY),
       new THREE.Vector3(width * 1.05, 0.2, depth * 1.05),
       roofColor,
       { animate },
@@ -149,7 +155,7 @@ export function generateWarehouse(seed, tilePosition, { animate = true } = {}) {
  * 風車：円柱の塔＋三角屋根＋十字に組んだ4枚の羽根。
  * フェーズ19で「町の評判」が一定値に達すると解放される建物。
  */
-export function generateWindmill(seed, tilePosition, { animate = true } = {}) {
+export function generateWindmill(seed, tilePosition, { animate = true, rotationY = 0 } = {}) {
   const parts = [];
   const towerColor = new THREE.Color(WINDMILL_TOWER_COLOR);
   const towerHeight = 1.6;
@@ -157,8 +163,8 @@ export function generateWindmill(seed, tilePosition, { animate = true } = {}) {
   parts.push(
     addInstance(
       UNIT_CYLINDER_POOL,
-      new THREE.Vector3(tilePosition.x, 0, tilePosition.z),
-      ZERO_ROTATION,
+      offsetPosition(tilePosition, 0, 0, 0, rotationY),
+      rotatedEuler(rotationY),
       new THREE.Vector3(0.45, towerHeight, 0.45),
       towerColor,
       { animate },
@@ -169,8 +175,8 @@ export function generateWindmill(seed, tilePosition, { animate = true } = {}) {
   parts.push(
     addInstance(
       UNIT_CONE_SQUARE_POOL,
-      new THREE.Vector3(tilePosition.x, towerHeight, tilePosition.z),
-      new THREE.Euler(0, Math.PI / 4, 0),
+      offsetPosition(tilePosition, 0, towerHeight, 0, rotationY),
+      rotatedEuler(rotationY, 0, Math.PI / 4, 0),
       new THREE.Vector3(0.5, 0.5, 0.5),
       roofColor,
       { animate },
@@ -178,13 +184,13 @@ export function generateWindmill(seed, tilePosition, { animate = true } = {}) {
   );
 
   const bladeColor = new THREE.Color(WINDMILL_BLADE_COLOR);
-  const bladeCenter = new THREE.Vector3(tilePosition.x, towerHeight * 0.85, tilePosition.z + 0.5);
+  const bladeCenter = offsetPosition(tilePosition, 0, towerHeight * 0.85, 0.5, rotationY);
   [0, Math.PI / 2, Math.PI, (Math.PI * 3) / 2].forEach((angle) => {
     parts.push(
       addInstance(
         UNIT_BOX_POOL,
         bladeCenter,
-        new THREE.Euler(0, 0, angle),
+        rotatedEuler(rotationY, 0, 0, angle),
         new THREE.Vector3(0.12, 0.9, 0.04),
         bladeColor,
         { animate },

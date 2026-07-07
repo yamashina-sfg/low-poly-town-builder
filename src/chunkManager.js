@@ -78,13 +78,14 @@ export function getProceduralTileType(worldSeed, globalX, globalY) {
 function computeChunkDiff(chunk, worldSeed) {
   const cells = [];
   chunk.tiles.forEach((tile) => {
-    const { globalX, globalY, tileType, indoorFurniture } = tile.userData;
+    const { globalX, globalY, tileType, indoorFurniture, rotationY } = tile.userData;
     const baseType = getProceduralTileType(worldSeed, globalX, globalY);
     if (tileType !== baseType) {
       const cell = { x: globalX, y: globalY, type: tileType };
       if (tileType === 'house' && Array.isArray(indoorFurniture) && indoorFurniture.some(Boolean)) {
         cell.furniture = indoorFurniture;
       }
+      if (rotationY) cell.rotationY = rotationY;
       cells.push(cell);
     }
   });
@@ -95,8 +96,8 @@ function computeChunkDiff(chunk, worldSeed) {
  * 指定チャンクが未生成なら生成する。生成済みなら何もせず既存のチャンクを返す
  * （何度呼んでも安全）。
  * onProceduralTile(tile, type)は自然生成で木などが配置されるタイルに対して呼ばれる。
- * onRestoreTile(tile, type, furniture)は、以前アンロードされ差分キャッシュに
- * 残っていたタイル（プレイヤーが手を加えたもの）を復元するときに呼ばれる。
+ * onRestoreTile(tile, type, furniture, rotationY)は、以前アンロードされ差分
+ * キャッシュに残っていたタイル（プレイヤーが手を加えたもの）を復元するときに呼ばれる。
  */
 export function ensureChunkExists(cx, cy, { worldSeed, onProceduralTile, onRestoreTile }) {
   const key = chunkKey(cx, cy);
@@ -124,7 +125,7 @@ export function ensureChunkExists(cx, cy, { worldSeed, onProceduralTile, onResto
     cachedDiff.forEach((cell) => {
       const tile = globalTileIndex.get(tileKey(cell.x, cell.y));
       if (tile && onRestoreTile) {
-        onRestoreTile(tile, cell.type, cell.furniture);
+        onRestoreTile(tile, cell.type, cell.furniture, cell.rotationY);
       }
     });
   }

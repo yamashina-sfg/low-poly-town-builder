@@ -165,7 +165,7 @@ function exitHouse() {
   document.getElementById('exit-building-button').classList.add('hidden');
 }
 
-initBuildSystem({ renderer, camera, onEnterHouse: enterHouse });
+initBuildSystem({ scene, renderer, camera, onEnterHouse: enterHouse });
 initInteractions({ scene, getCharacterPosition });
 
 document.getElementById('exit-building-button').addEventListener('click', exitHouse);

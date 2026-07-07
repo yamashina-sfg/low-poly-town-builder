@@ -4,7 +4,8 @@ const SAVE_KEY = 'lowPolyTownBuilder:save';
 // フォーマットを変更するときはインクリメントする。
 // v1: { seed, cells } のみ（経済・室内家具は未保存だった）
 // v2: version, economy（木材・お金）, cells[].furniture（住居内の家具配置）を追加
-const SAVE_VERSION = 2;
+// v3: cells[].rotationY（建築プレビューでのRキー回転）を追加
+const SAVE_VERSION = 3;
 
 /**
  * 自然生成の下地(getProceduralTileType)と実際のタイル種別が異なるものだけを
@@ -12,17 +13,19 @@ const SAVE_VERSION = 2;
  * 自然生成の木などは保存せずに済み（読込時に同じシードから再現される）、
  * 逆に「自然に生えた木を更地に戻した」といった変更は正しく保存される。
  * 住居タイルは、室内に家具が1つでも置かれていればfurniture配列も保存する。
+ * 回転(rotationY)を持つ建物・装飾は、その値も保存する。
  */
 export function serializeTown(forEachLoadedTile, worldSeed, economy) {
   const cells = [];
   forEachLoadedTile((tile) => {
-    const { globalX, globalY, tileType, indoorFurniture } = tile.userData;
+    const { globalX, globalY, tileType, indoorFurniture, rotationY } = tile.userData;
     const baseType = getProceduralTileType(worldSeed, globalX, globalY);
     if (tileType !== baseType) {
       const cell = { x: globalX, y: globalY, type: tileType };
       if (tileType === 'house' && Array.isArray(indoorFurniture) && indoorFurniture.some(Boolean)) {
         cell.furniture = indoorFurniture;
       }
+      if (rotationY) cell.rotationY = rotationY;
       cells.push(cell);
     }
   });

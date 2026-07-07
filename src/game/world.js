@@ -64,6 +64,21 @@ const PROCEDURAL_GENERATORS = {
 export const BUILDING_TYPES = new Set(['house', 'shop', 'well', 'warehouse', 'windmill']);
 export const FURNITURE_TYPES = new Set(['bed', 'table', 'chair', 'fireplace']);
 export const DECORATION_TYPES = new Set(['fence', 'streetlamp', 'bench', 'flowerbed', 'signpost', 'statue']);
+// 建物・装飾（＝地形ではないもの）は、既に何か置かれているタイルには重ねて
+// 設置できない（フェーズ21：建築プレビューの重なりチェック）。木・道路・水・
+// 更地に戻すといった地形系の変更は、これまで通り上書きを許可する。
+const STRUCTURE_TYPES = new Set([...BUILDING_TYPES, ...DECORATION_TYPES]);
+
+/**
+ * type種類のオブジェクトをtileに設置できるか（重なりチェック）。
+ * 地形系の種類は常に設置可能（上書き）。建物・装飾は、対象タイルが
+ * 更地(grass)のときだけ設置できる。
+ */
+export function isTilePlaceable(tile, type) {
+  if (!tile) return false;
+  if (!STRUCTURE_TYPES.has(type)) return true;
+  return tile.userData.tileType === 'grass';
+}
 
 // 建物数・木の数・装飾数・建物の種類ごとの内訳は毎回全タイルを舐めて数え直す
 // のではなく、タイル種別が変わった瞬間に増減させるインクリメンタルな
@@ -198,10 +213,11 @@ function refreshRoadTile(tile) {
  * 再構築しても・チャンクを再訪しても同じ見た目になる。
  * animate: falseにすると、自然生成・読込・シード変更時などポップアップ演出を出さない。
  */
-export function buildOnTile(tile, type, { animate = true } = {}) {
+export function buildOnTile(tile, type, { animate = true, rotationY = 0 } = {}) {
   clearTileObject(tile);
   trackTileTypeRemoved(tile.userData.tileType);
   tile.userData.tileType = type === 'clear' ? 'grass' : type;
+  tile.userData.rotationY = type === 'clear' ? 0 : rotationY;
   trackTileTypeAdded(tile.userData.tileType);
 
   if (type === 'house') {
@@ -216,7 +232,7 @@ export function buildOnTile(tile, type, { animate = true } = {}) {
 
   if (generatorEntry) {
     const seed = computeSeed(globalX, globalY, generatorEntry.salt);
-    tile.userData.object = generatorEntry.generate(seed, tile.position, { animate });
+    tile.userData.object = generatorEntry.generate(seed, tile.position, { animate, rotationY });
   } else if (type === 'water') {
     const object3D = generateWater(tile.position, TILE_SIZE, { animate });
     sceneRef.add(object3D);
@@ -230,6 +246,21 @@ export function buildOnTile(tile, type, { animate = true } = {}) {
 
   // このタイルの変化で隣接する道路タイルの接続形状が変わるかもしれないため更新する
   getNeighborTiles(tile).forEach(refreshRoadTile);
+}
+
+/**
+ * 設置済みの建物・装飾を別のタイルへ移動する（フェーズ21：移動メニュー）。
+ * 住居の場合は室内の家具レイアウトも引き継ぐ。rotationYOverrideを渡すと、
+ * 移動と同時に向きも変更できる（省略時は元の向きを引き継ぐ）。
+ */
+export function moveTileContent(fromTile, toTile, rotationYOverride) {
+  const { tileType, rotationY, indoorFurniture } = fromTile.userData;
+  const finalRotationY = rotationYOverride ?? rotationY ?? 0;
+  buildOnTile(fromTile, 'clear');
+  buildOnTile(toTile, tileType, { rotationY: finalRotationY });
+  if (tileType === 'house' && Array.isArray(indoorFurniture)) {
+    toTile.userData.indoorFurniture = indoorFurniture.slice();
+  }
 }
 
 const LANDMARK_TYPES = new Set(['ruins', 'specialTree']);
@@ -257,8 +288,8 @@ function handleProceduralTile(tile, type) {
  * 加えたもの）を、チャンク再訪時に復元する。セーブデータ読込時のセル
  * 復元とも共通のロジック。
  */
-function handleRestoreTile(tile, type, furniture) {
-  buildOnTile(tile, type, { animate: false });
+function handleRestoreTile(tile, type, furniture, rotationY = 0) {
+  buildOnTile(tile, type, { animate: false, rotationY });
   if (type === 'house' && Array.isArray(furniture)) {
     tile.userData.indoorFurniture = furniture.slice();
   }
@@ -463,7 +494,7 @@ export function loadWorld() {
     ensureChunkForGlobalTile(cell.x, cell.y, { worldSeed, onProceduralTile: handleProceduralTile });
     const tile = getGlobalTile(cell.x, cell.y);
     if (!tile) return;
-    handleRestoreTile(tile, cell.type, cell.furniture);
+    handleRestoreTile(tile, cell.type, cell.furniture, cell.rotationY);
   });
 
   return { seed: worldSeed };

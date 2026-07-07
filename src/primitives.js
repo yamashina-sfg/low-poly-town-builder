@@ -31,3 +31,41 @@ registerPool(UNIT_SPHERE_POOL, unitSphereGeometry, makeInstancedMaterial());
 
 export const ZERO_ROTATION = new THREE.Euler(0, 0, 0);
 export { UNIT_BOX_POOL };
+
+// ------------------------------------------------------------------
+// 建築プレビューの回転（フェーズ21：Rキーで90度単位に回転）に対応するための
+// 共通ヘルパー。各ジェネレーターは、タイル中心からのローカルなオフセット
+// (offsetX, offsetZ)をrotationYだけ回転させた位置にパーツを配置し、
+// パーツ自身の向きにもrotationYを加える。これにより、柵・ベンチ・看板
+// など中心からずれた位置にパーツを持つ建物も、正しく向きを変えられる。
+const rotationAxis = new THREE.Vector3(0, 1, 0);
+
+/**
+ * タイル中心(tilePosition)からのローカルオフセット(offsetX, offsetZ)を
+ * rotationYだけ回転させた、ワールド座標のVector3を返す。
+ */
+export function offsetPosition(tilePosition, offsetX, offsetY, offsetZ, rotationY = 0) {
+  if (!rotationY) {
+    return new THREE.Vector3(tilePosition.x + offsetX, offsetY, tilePosition.z + offsetZ);
+  }
+  const cos = Math.cos(rotationY);
+  const sin = Math.sin(rotationY);
+  const rotatedX = offsetX * cos + offsetZ * sin;
+  const rotatedZ = -offsetX * sin + offsetZ * cos;
+  return new THREE.Vector3(tilePosition.x + rotatedX, offsetY, tilePosition.z + rotatedZ);
+}
+
+/**
+ * 既存のEuler(baseX, baseY, baseZ)にrotationYを加えたEulerを返す
+ * （パーツ自身の向きを、建物全体の回転に合わせて回すため）。
+ */
+export function rotatedEuler(rotationY = 0, baseX = 0, baseY = 0, baseZ = 0) {
+  return new THREE.Euler(baseX, baseY + rotationY, baseZ);
+}
+
+/**
+ * ベクトルをY軸周りにrotationYだけ回転させる（applyAxisAngleのラッパー）。
+ */
+export function rotateVectorY(vector, rotationY) {
+  return vector.clone().applyAxisAngle(rotationAxis, rotationY);
+}

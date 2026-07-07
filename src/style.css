@@ -458,3 +458,118 @@ canvas {
   background: rgba(255, 255, 255, 0.75);
   pointer-events: none;
 }
+
+/* フェーズ21：建築プレビューのコスト表示（マウス付近に追従） */
+.build-preview-cost {
+  position: fixed;
+  z-index: 15;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(20, 20, 20, 0.85);
+  color: #fff;
+  font-family: monospace;
+  font-size: 13px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.build-preview-cost.hidden {
+  display: none;
+}
+
+.build-preview-cost.insufficient {
+  color: #ff8a80;
+  font-weight: bold;
+}
+
+/* フェーズ21：既存の建物・装飾をクリックしたときの入る/移動/撤去メニュー */
+.tile-context-menu {
+  position: fixed;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  width: 130px;
+  background: rgba(30, 40, 30, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.tile-context-menu.hidden {
+  display: none;
+}
+
+.tile-context-menu button {
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #223322;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tile-context-menu button:hover {
+  background: #ffffff;
+}
+
+.tile-context-menu button.hidden {
+  display: none;
+}
+
+/* フェーズ21：範囲選択モードのトグルボタンと確認バー */
+.range-select-toggle {
+  position: fixed;
+  top: 54px;
+  right: 8px;
+  z-index: 10;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.range-select-toggle.active {
+  background: #c9564c;
+}
+
+.range-select-confirm {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: rgba(20, 20, 20, 0.9);
+  color: #fff;
+  font-size: 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.range-select-confirm.hidden {
+  display: none;
+}
+
+.range-select-confirm button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #223322;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.range-select-confirm button:hover {
+  background: #ffffff;
+}
