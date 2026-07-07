@@ -1,7 +1,13 @@
 import { createNPC } from '../npc.js';
 import { createBird, createDog } from '../creatures.js';
 import { pushEntitiesApart } from '../collision.js';
-import { resolveOutdoorCollision, getHouseTiles, getShopTiles, isConnectedToRoad } from './world.js';
+import {
+  resolveOutdoorCollision,
+  getHouseTiles,
+  getShopTiles,
+  isConnectedToRoad,
+  getGroundHeightAt,
+} from './world.js';
 import { getGameTime } from '../gameTime.js';
 import { findRoadPath } from '../road.js';
 import { getGlobalTile, worldToGlobalTileCoords } from '../chunkManager.js';
@@ -266,6 +272,15 @@ export function updatePopulace(delta, elapsedTime) {
 
   npcs.forEach((npc) => resolveOutdoorCollision(npc.group.position, NPC_COLLISION_RADIUS));
   dogs.forEach((dog) => resolveOutdoorCollision(dog.group.position, DOG_COLLISION_RADIUS));
+
+  // 橋のアーチに沿って、NPC・犬も実際に高さを登り降りしながら渡れるようにする
+  // （プレイヤーのmain.jsと同じgetGroundHeightAtを使い、通常の地面では常に0）。
+  npcs.forEach((npc) => {
+    npc.group.position.y = getGroundHeightAt(npc.group.position.x, npc.group.position.z);
+  });
+  dogs.forEach((dog) => {
+    dog.group.position.y = getGroundHeightAt(dog.group.position.x, dog.group.position.z);
+  });
 }
 
 /**

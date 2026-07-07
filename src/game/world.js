@@ -27,7 +27,7 @@ import {
   generateSignpost,
   generateStatue,
 } from '../decorations.js';
-import { generateRoad, computeRoadConnections, ROAD_TYPES } from '../road.js';
+import { generateRoad, computeRoadConnections, ROAD_TYPES, getBridgeSurfaceHeight } from '../road.js';
 import { generateWater } from '../water.js';
 import { removeInstance } from '../instancing.js';
 import { getWood, getMoney, setResources } from '../economy.js';
@@ -214,6 +214,14 @@ function clearTileObject(tile) {
   } else if (entry.kind === 'mesh') {
     sceneRef.remove(entry.object3D);
     entry.object3D.geometry.dispose();
+  } else if (entry.kind === 'composite') {
+    // 橋：InstancedMeshのパーツ（デッキ・欄干）と、下に見える水面の専用
+    // メッシュの両方を保持するため、両方まとめて解放する。
+    entry.parts.forEach((part) => removeInstance(part));
+    entry.meshes.forEach((object3D) => {
+      sceneRef.remove(object3D);
+      object3D.geometry.dispose();
+    });
   }
 
   tile.userData.object = null;
@@ -230,14 +238,43 @@ function getNeighborTiles(tile) {
 }
 
 /**
- * 道路タイルの見た目（直線・角・T字・十字）を隣接状況から再計算する。
- * 道路以外のタイルには何もしない。チャンクをまたいだ隣接タイルも参照できる。
+ * 道タイルの見た目（直線・角・T字・十字、橋なら開いている方向やアーチの
+ * 形）を隣接状況から再計算する。道以外のタイルには何もしない。
+ * チャンクをまたいだ隣接タイルも参照できる。
+ * 橋（複数タイルにまたがるスパン）は、隣に橋タイルが増えたときも
+ * 既存タイル側のアーチの形が古いままにならないよう、ROAD_TYPES全種類
+ * （土の道・石畳・橋も含む）を対象にする（以前はplain roadのみが対象で、
+ * 他の道種別は隣接変化時に再描画されない不具合があった）。
  */
 function refreshRoadTile(tile) {
-  if (tile.userData.tileType !== 'road') return;
-  clearTileObject(tile);
-  const connections = computeRoadConnections(getGlobalTile, tile.userData.globalX, tile.userData.globalY);
-  tile.userData.object = generateRoad(tile.position, connections);
+  if (!ROAD_TYPES.has(tile.userData.tileType)) return;
+  const { globalX, globalY, tileType, rotationY = 0 } = tile.userData;
+  const connections = computeRoadConnections(getGlobalTile, globalX, globalY);
+  const roadResult = generateRoad(tile.position, connections, {
+    type: tileType,
+    rotationY,
+    getGlobalTile,
+    globalX,
+    globalY,
+  });
+
+  // InstancedMeshのパーツ（デッキ・欄干）だけを差し替える。橋の場合、下に
+  // 見える水面メッシュは隣接状況が変わっても見た目が変わらないため、
+  // 破棄・再生成せずそのまま使い回す（clearTileObjectを使うと水面ごと
+  // 消えて再ポップインしてしまうため、ここでは使わない）。
+  const previousEntry = tile.userData.object;
+  if (previousEntry?.kind === 'instances' || previousEntry?.kind === 'composite') {
+    previousEntry.parts.forEach((part) => removeInstance(part));
+  }
+
+  if (tileType === 'bridge') {
+    const reusedWaterMesh = previousEntry?.kind === 'composite' ? previousEntry.meshes[0] : null;
+    const waterMesh = reusedWaterMesh ?? generateWater(tile.position, TILE_SIZE, { animate: false });
+    if (!reusedWaterMesh) sceneRef.add(waterMesh);
+    tile.userData.object = { kind: 'composite', parts: roadResult.parts, meshes: [waterMesh] };
+  } else {
+    tile.userData.object = roadResult;
+  }
 }
 
 /**
@@ -273,13 +310,55 @@ export function buildOnTile(tile, type, { animate = true, rotationY = 0 } = {}) 
     tile.userData.object = { kind: 'mesh', object3D };
   } else if (ROAD_TYPES.has(type)) {
     const connections = computeRoadConnections(getGlobalTile, globalX, globalY);
-    tile.userData.object = generateRoad(tile.position, connections, { animate, type, rotationY });
+    const roadResult = generateRoad(tile.position, connections, {
+      animate,
+      type,
+      rotationY,
+      getGlobalTile,
+      globalX,
+      globalY,
+    });
+    if (type === 'bridge') {
+      // 橋は必ず水タイルの上に架けるもの（isTilePlaceable）なので、下に
+      // 見える水面メッシュも合わせて生成し、デッキ・欄干とまとめて保持する
+      // （橋を撤去/移動すると、この水面ごと消える＝跡地は水タイルに戻る）。
+      const waterMesh = generateWater(tile.position, TILE_SIZE, { animate });
+      sceneRef.add(waterMesh);
+      tile.userData.object = { kind: 'composite', parts: roadResult.parts, meshes: [waterMesh] };
+    } else {
+      tile.userData.object = roadResult;
+    }
   }
 
   trackInteractiveTile(tile, type);
 
   // このタイルの変化で隣接する道路タイルの接続形状が変わるかもしれないため更新する
   getNeighborTiles(tile).forEach(refreshRoadTile);
+  // 橋は複数タイルにまたがる1つのアーチとして描画されるため、直接の隣接
+  // タイルだけでなく、四方向に連続する橋タイルを端まで辿って全て再描画する
+  // （でないと、スパンの端から離れた位置にある橋タイルの形状が、スパンの
+  // 長さが変わった後も古いまま取り残されてしまう）。
+  refreshBridgeSpansNear(tile);
+}
+
+function refreshBridgeSpansNear(tile) {
+  const { globalX, globalY } = tile.userData;
+  [
+    [0, -1],
+    [0, 1],
+    [-1, 0],
+    [1, 0],
+  ].forEach(([dx, dy]) => {
+    let x = globalX + dx;
+    let y = globalY + dy;
+    for (;;) {
+      const neighbor = getGlobalTile(x, y);
+      if (!neighbor || neighbor.userData.tileType !== 'bridge') break;
+      refreshRoadTile(neighbor);
+      x += dx;
+      y += dy;
+    }
+  });
 }
 
 /**
@@ -446,6 +525,18 @@ function getNearbyOutdoorTiles(x, z) {
 
 export function resolveOutdoorCollision(position, radius) {
   resolveCollisionAgainstTiles(position, radius, getNearbyOutdoorTiles(position.x, position.z));
+}
+
+/**
+ * (worldX, worldZ)地点に立っているキャラクター/NPCの足元の高さを返す。
+ * 通常の地面・道の上では0（従来通り）。橋のアーチの上にいる場合だけ、
+ * そのアーチの形状に沿った高さを返す。屋外の移動処理から毎フレーム
+ * 呼ばれ、Y座標に反映することで橋を実際に登り降りしながら渡れるようにする。
+ */
+export function getGroundHeightAt(worldX, worldZ) {
+  const { gx, gy } = worldToGlobalTileCoords(worldX, worldZ);
+  const tile = getGlobalTile(gx, gy);
+  return getBridgeSurfaceHeight(getGlobalTile, tile, worldX, worldZ);
 }
 
 export function resolveIndoorCollision(position, radius) {

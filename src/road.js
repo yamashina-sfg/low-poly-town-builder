@@ -103,72 +103,179 @@ function generatePlainRoad(tilePosition, connections, { animate = false, type = 
 
 const BRIDGE_DECK_COLOR = new THREE.Color(WOOD_COLOR);
 const BRIDGE_RAIL_COLOR = new THREE.Color(0x5c3c26); // デッキよりやや濃い木の色
-// デッキは道路の土台(y=0〜0.02)に近い高さにして、隣接する道・地面との
-// 段差が目立たないようにする。
+// デッキの「低い端」は道路の土台(y=0〜0.02)に近い高さにして、隣接する道・
+// 地面との段差が目立たないようにする。中央はBRIDGE_ARCH_HEIGHTぶん高くなる。
 const DECK_BOTTOM_Y = 0.02;
 const DECK_HEIGHT = 0.08;
-const DECK_TOP_Y = DECK_BOTTOM_Y + DECK_HEIGHT;
 const RAIL_HEIGHT = 0.34;
 const RAIL_THICKNESS = 0.07;
+const BRIDGE_ARCH_HEIGHT = 0.6; // 橋の中央が、両端よりどれだけ高く盛り上がるか
+const SEGMENTS_PER_TILE = 4; // デッキ・欄干をこの数の板に分割し、少しずつ角度・高さを変えてアーチにする
+const SEGMENT_OVERLAP = 0.05; // 板同士の継ぎ目に隙間ができないよう、わずかに重ねる
+const RAIL_INSET = 0.08; // 欄干をタイル端から少しだけ内側に置く
+
+function archHeightAtT(t) {
+  const clamped = Math.min(1, Math.max(0, t));
+  return BRIDGE_ARCH_HEIGHT * Math.sin(Math.PI * clamped);
+}
 
 /**
- * 橋：水の上に架ける道。タイル全面を覆う薄い板張りの床（隣接する道・地面と
- * 高さが揃うよう低めに配置）に、進行方向の左右にだけ低い欄干を立てる
- * （前後＝道が続く方向は開けておき、歩いて通り抜けられるようにする）。
- * どちらを「左右」とするかはrotationY（フェーズ21のRキー回転）で決まり、
- * 実際に道・橋が接続している方向は、回転にかかわらず常に開けておく。
+ * 橋の「進行方向」（アーチが登る軸、かつ欄干を付けない前後）を決める。
+ * 実際に道・橋が接続している方向があればそれを優先し（両方の軸に接続が
+ * ある交差点はNS優先の固定扱い）、どこにも接続されていない孤立したタイル
+ * ではrotationY（フェーズ21のRキー回転）から決める。
  */
-function generateBridge(tilePosition, connections, { animate = false, rotationY = 0 } = {}) {
-  const parts = [];
+function resolveBridgeAxis(connections, rotationY) {
+  const hasNS = connections.N || connections.S;
+  const hasEW = connections.E || connections.W;
+  if (hasNS && !hasEW) return 'NS';
+  if (hasEW && !hasNS) return 'EW';
+  if (hasNS && hasEW) return 'NS';
+  const steps = Math.round(rotationY / (Math.PI / 2)) % 4;
+  return steps % 2 === 0 ? 'NS' : 'EW';
+}
 
-  // 床（デッキ）：正方形なので回転させても見た目は変わらないが、
-  // 他のジェネレーターとの一貫性のためrotationYはそのまま渡しておく。
-  parts.push(
-    addInstance(
-      UNIT_BOX_POOL,
-      new THREE.Vector3(tilePosition.x, DECK_BOTTOM_Y, tilePosition.z),
-      new THREE.Euler(0, rotationY, 0),
-      new THREE.Vector3(TILE_SIZE, DECK_HEIGHT, TILE_SIZE),
-      BRIDGE_DECK_COLOR,
-      { animate },
-    ),
+/**
+ * axis方向に連続している橋タイルの中で、このタイルが何番目か・全体で
+ * 何タイル分あるかを、実際のタイルオブジェクトは取得せず隣接判定だけで
+ * 数える。橋が複数タイルにまたがる場合、タイル単体ではなく橋全体
+ * （スパン）を1つの滑らかなアーチにするために使う。
+ * getGlobalTileが無い（グリッド情報を持たない）場合は、このタイル単体を
+ * 長さ1のスパンとして扱う。
+ */
+function walkBridgeSpan(getGlobalTile, globalX, globalY, axis) {
+  if (!getGlobalTile) return { indexInSpan: 0, spanLength: 1 };
+
+  const dx = axis === 'EW' ? 1 : 0;
+  const dz = axis === 'NS' ? 1 : 0;
+
+  let back = 0;
+  for (;;) {
+    const neighbor = getGlobalTile(globalX - dx * (back + 1), globalY - dz * (back + 1));
+    if (!neighbor || neighbor.userData.tileType !== 'bridge') break;
+    back += 1;
+  }
+  let forward = 0;
+  for (;;) {
+    const neighbor = getGlobalTile(globalX + dx * (forward + 1), globalY + dz * (forward + 1));
+    if (!neighbor || neighbor.userData.tileType !== 'bridge') break;
+    forward += 1;
+  }
+  return { indexInSpan: back, spanLength: back + forward + 1 };
+}
+
+/**
+ * このタイルが属する橋スパイン全体の、ワールド座標上の開始位置(axis方向)と
+ * 全長を求める。他のタイルのpositionを取得しなくても、タイルは等間隔の
+ * グリッド上に並ぶという前提だけで計算できる（どのタイルから計算しても
+ * 同じ値になる）。
+ */
+function computeSpanRange(tilePosition, axis, indexInSpan, spanLength) {
+  const axisCoord = axis === 'NS' ? tilePosition.z : tilePosition.x;
+  const start = axisCoord - indexInSpan * TILE_SIZE - TILE_SIZE / 2;
+  const length = spanLength * TILE_SIZE;
+  return { start, length };
+}
+
+/**
+ * 橋：水の上に架ける道。1タイルの中でも、さらに橋全体（連続する橋タイルの
+ * スパン）の中でも、中央が高く両端が低いなだらかなアーチになるよう、
+ * デッキ・欄干をSEGMENTS_PER_TILE枚の板に分割し、少しずつ高さ・角度を
+ * 変えて並べる。デッキは水面よりはっきり高い位置に来るため、下に隙間が
+ * でき水面が透けて見える。進行方向（アーチが登る軸）の前後は常に開けて
+ * おき、左右の縁にだけ低い欄干を立てる。実際に道・橋が接続している方向は
+ * 回転にかかわらず常に開けておく。
+ */
+function generateBridge(
+  tilePosition,
+  connections,
+  { animate = false, rotationY = 0, getGlobalTile = null, globalX = 0, globalY = 0 } = {},
+) {
+  const parts = [];
+  const axis = resolveBridgeAxis(connections, rotationY);
+  const axisIsNS = axis === 'NS';
+  const { indexInSpan, spanLength } = walkBridgeSpan(getGlobalTile, globalX, globalY, axis);
+  const { start: spanStart, length: spanTotalLength } = computeSpanRange(
+    tilePosition,
+    axis,
+    indexInSpan,
+    spanLength,
   );
 
-  // rotationYを90度刻みのステップ数に変換し、南北(N/S)方向が「進行方向
-  // （＝欄干を付けない前後）」になるのを基準に、90度回転するごとに
-  // 東西(E/W)方向と入れ替える。
-  const rotationSteps = Math.round(rotationY / (Math.PI / 2)) % 4;
-  const isNorthSouthOpenByDefault = rotationSteps % 2 === 0;
+  const tileAxisCenter = axisIsNS ? tilePosition.z : tilePosition.x;
+  const segmentLength = TILE_SIZE / SEGMENTS_PER_TILE;
 
+  function heightAt(worldAxisPos) {
+    return archHeightAtT((worldAxisPos - spanStart) / spanTotalLength);
+  }
+
+  // 傾いた板（デッキ・欄干共通）を1枚追加する。baseYはこの板の「低い端の
+  // 高さ0のときの」基準Y（デッキ自身ならDECK_BOTTOM_Y、デッキの上に乗る
+  // 欄干ならデッキ表面の高さ）。localStart/localEndはタイル中心からの
+  // axis方向オフセット。
+  function addSlopedBox(perpOffset, baseY, scaleAcross, thickness, color, localStart, localEnd) {
+    const hStart = heightAt(tileAxisCenter + localStart);
+    const hEnd = heightAt(tileAxisCenter + localEnd);
+    const hMid = (hStart + hEnd) / 2;
+    const axisCenter = (localStart + localEnd) / 2;
+    const tilt = Math.atan2(hEnd - hStart, localEnd - localStart);
+
+    const position = new THREE.Vector3(
+      tilePosition.x + (axisIsNS ? perpOffset : axisCenter),
+      baseY + hMid,
+      tilePosition.z + (axisIsNS ? axisCenter : perpOffset),
+    );
+    // 単位ボックスは底面ピボット。傾きは、進行方向に伸びる辺を軸と直交する
+    // 水平回転軸で回すことで表現する（NS軸ならX軸回り、EW軸ならZ軸回り）。
+    const rotation = axisIsNS ? new THREE.Euler(-tilt, 0, 0) : new THREE.Euler(0, 0, tilt);
+    const length = localEnd - localStart + SEGMENT_OVERLAP;
+    const scale = axisIsNS
+      ? new THREE.Vector3(scaleAcross, thickness, length)
+      : new THREE.Vector3(length, thickness, scaleAcross);
+    parts.push(addInstance(UNIT_BOX_POOL, position, rotation, scale, color, { animate }));
+  }
+
+  // デッキ：区画ごとに高さ・傾きを変えた板を並べ、中央が高いなだらかな
+  // アーチにする。
+  for (let i = 0; i < SEGMENTS_PER_TILE; i += 1) {
+    const localStart = -TILE_SIZE / 2 + i * segmentLength;
+    const localEnd = localStart + segmentLength;
+    addSlopedBox(0, DECK_BOTTOM_Y, TILE_SIZE, DECK_HEIGHT, BRIDGE_DECK_COLOR, localStart, localEnd);
+  }
+
+  // 欄干：進行方向（開けておく軸）と直交する左右の縁にだけ、デッキと同じ
+  // 傾きの低い手すりを並べる。実際に道・橋が接続している側は開けておく。
   DIRECTIONS.forEach(({ key, dx, dz }) => {
     const isNorthSouth = dx === 0;
-    const isOpenByRotation = isNorthSouth === isNorthSouthOpenByDefault;
-    // 道・橋が実際に接続している方向は、回転の向きに関係なく常に開けておく
-    // （通行の妨げにならないようにする）。
-    if (isOpenByRotation || connections[key]) return;
+    const isOpenSide = isNorthSouth === axisIsNS;
+    if (isOpenSide || connections[key]) return;
 
-    const isHorizontalEdge = dx !== 0; // 東西の縁＝南北方向に伸びる欄干
-    const railScale = isHorizontalEdge
-      ? new THREE.Vector3(RAIL_THICKNESS, RAIL_HEIGHT, TILE_SIZE * 0.92)
-      : new THREE.Vector3(TILE_SIZE * 0.92, RAIL_HEIGHT, RAIL_THICKNESS);
-    const railPosition = new THREE.Vector3(
-      tilePosition.x + dx * TILE_SIZE * 0.46,
-      DECK_TOP_Y,
-      tilePosition.z + dz * TILE_SIZE * 0.46,
-    );
-    parts.push(
-      addInstance(UNIT_BOX_POOL, railPosition, ZERO_ROTATION, railScale, BRIDGE_RAIL_COLOR, { animate }),
-    );
+    const sign = dx !== 0 ? dx : dz;
+    const perpOffset = sign * (TILE_SIZE / 2 - RAIL_INSET);
+    const railBaseY = DECK_BOTTOM_Y + DECK_HEIGHT;
 
-    // 欄干の両端に、細い柱を1本ずつ立てて橋らしいディテールを加える。
-    const postOffset = isHorizontalEdge
-      ? new THREE.Vector3(0, 0, TILE_SIZE * 0.46)
-      : new THREE.Vector3(TILE_SIZE * 0.46, 0, 0);
-    [-1, 1].forEach((sign) => {
+    for (let i = 0; i < SEGMENTS_PER_TILE; i += 1) {
+      const localStart = -TILE_SIZE / 2 + i * segmentLength;
+      const localEnd = localStart + segmentLength;
+      addSlopedBox(
+        perpOffset,
+        railBaseY,
+        RAIL_THICKNESS,
+        RAIL_HEIGHT,
+        BRIDGE_RAIL_COLOR,
+        localStart,
+        localEnd,
+      );
+    }
+
+    // 区画の境目ごとに柱を立てる（隣接タイルの柱とも高さがきちんとそろう）。
+    for (let i = 0; i <= SEGMENTS_PER_TILE; i += 1) {
+      const localPos = -TILE_SIZE / 2 + i * segmentLength;
+      const h = heightAt(tileAxisCenter + localPos);
       const postPosition = new THREE.Vector3(
-        railPosition.x + postOffset.x * sign,
-        DECK_TOP_Y,
-        railPosition.z + postOffset.z * sign,
+        tilePosition.x + (axisIsNS ? perpOffset : localPos),
+        railBaseY + h,
+        tilePosition.z + (axisIsNS ? localPos : perpOffset),
       );
       parts.push(
         addInstance(
@@ -180,23 +287,45 @@ function generateBridge(tilePosition, connections, { animate = false, rotationY 
           { animate },
         ),
       );
-    });
+    }
   });
 
   return { kind: 'instances', parts };
 }
 
 /**
+ * tileが橋タイルであれば、そのアーチに沿った「歩行面の高さ」
+ * （worldX, worldZ地点でのデッキ表面のY座標）を返す。橋でなければ0
+ * （通常の地面の高さ）を返す。プレイヤー/NPCが橋を渡るとき、移動後の
+ * X/Z座標からこの高さを求めてY座標に反映することで、アーチに沿って
+ * 実際に高さが変化しながら歩けるようにする。
+ */
+export function getBridgeSurfaceHeight(getGlobalTile, tile, worldX, worldZ) {
+  if (!tile || tile.userData.tileType !== 'bridge') return 0;
+  const { globalX, globalY, rotationY = 0 } = tile.userData;
+  const connections = computeRoadConnections(getGlobalTile, globalX, globalY);
+  const axis = resolveBridgeAxis(connections, rotationY);
+  const { indexInSpan, spanLength } = walkBridgeSpan(getGlobalTile, globalX, globalY, axis);
+  const { start, length } = computeSpanRange(tile.position, axis, indexInSpan, spanLength);
+  const worldAxisPos = axis === 'NS' ? worldZ : worldX;
+  return DECK_BOTTOM_Y + DECK_HEIGHT + archHeightAtT((worldAxisPos - start) / length);
+}
+
+/**
  * 道タイルを生成する。type（'road'|'dirtRoad'|'cobblestone'|'bridge'）に応じて
  * 見た目を切り替える。いずれも接続方向(connections)から自動的に見た目が決まる。
+ * 橋はさらに、getGlobalTile/globalX/globalYから連続する橋タイルのスパンを
+ * 求め、アーチの形状に反映する。
  * @returns {{ kind: 'instances', parts: Array<{key: string, index: number}> }}
  */
 export function generateRoad(
   tilePosition,
   connections,
-  { animate = false, type = 'road', rotationY = 0 } = {},
+  { animate = false, type = 'road', rotationY = 0, getGlobalTile = null, globalX = 0, globalY = 0 } = {},
 ) {
-  if (type === 'bridge') return generateBridge(tilePosition, connections, { animate, rotationY });
+  if (type === 'bridge') {
+    return generateBridge(tilePosition, connections, { animate, rotationY, getGlobalTile, globalX, globalY });
+  }
   return generatePlainRoad(tilePosition, connections, { animate, type });
 }
 

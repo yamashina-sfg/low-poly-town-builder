@@ -39,6 +39,7 @@ import {
   enterIndoorSession,
   exitIndoorSession,
   setLandmarkDiscoveredHandler,
+  getGroundHeightAt,
 } from './game/world.js';
 import {
   initPlayer,
@@ -321,6 +322,9 @@ function animate() {
   } else {
     const characterPosition = getCharacterPosition();
     resolveOutdoorCollision(characterPosition, PLAYER_COLLISION_RADIUS);
+    // 橋のアーチに沿って、実際に高さを登り降りしながら渡れるようにする
+    // （通常の地面・道の上では常に0が返るため、これまで通り平坦になる）。
+    characterPosition.y = getGroundHeightAt(characterPosition.x, characterPosition.z);
 
     if (isMoving) {
       // キャラが今いるチャンクが変わったときだけ、周囲3x3チャンクの生成漏れを
