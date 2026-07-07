@@ -50,6 +50,24 @@ describe('serializeTown', () => {
     expect(data.economy).toEqual({ wood: 5, money: 10 });
     expect(typeof data.version).toBe('number');
   });
+
+  test('フェーズ23：populace（NPCの家・満足度）を含む。省略時は空配列になる', () => {
+    const tiles = makeFakeTiles();
+    const populace = [{ homeX: 2, homeY: 2, satisfaction: 42, clothingColor: 0xff0000, hatColor: 0x00ff00 }];
+    const withPopulace = serializeTown(
+      (cb) => forEachFakeTile(tiles, cb),
+      WORLD_SEED,
+      { wood: 5, money: 10 },
+      populace,
+    );
+    expect(withPopulace.populace).toEqual(populace);
+
+    const withoutPopulace = serializeTown((cb) => forEachFakeTile(tiles, cb), WORLD_SEED, {
+      wood: 5,
+      money: 10,
+    });
+    expect(withoutPopulace.populace).toEqual([]);
+  });
 });
 
 describe('localStorageへの保存・読込', () => {
@@ -64,6 +82,14 @@ describe('localStorageへの保存・読込', () => {
     expect(loaded.seed).toBe(WORLD_SEED);
     expect(loaded.economy).toEqual({ wood: 5, money: 10 });
     expect(loaded.cells.find((c) => c.x === 2 && c.y === 2).type).toBe('house');
+  });
+
+  test('フェーズ23：populace（NPCの家・満足度）も往復一致する', () => {
+    const tiles = makeFakeTiles();
+    const populace = [{ homeX: 2, homeY: 2, satisfaction: 77, clothingColor: 0x123456, hatColor: 0x654321 }];
+    saveTownToLocalStorage((cb) => forEachFakeTile(tiles, cb), WORLD_SEED, { wood: 5, money: 10 }, populace);
+    const loaded = loadTownFromLocalStorage();
+    expect(loaded.populace).toEqual(populace);
   });
 
   test('セーブデータが存在しなければnullを返す', () => {

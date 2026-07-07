@@ -20,6 +20,9 @@ export function createNPC({ homeX, homeZ, clothingColor, hatColor, radius = 4, s
   controller.group.rotation.y = facing;
 
   let destination = null; // { x, z, arriveDistance } | null（設定されている間は徘徊よりそちらを優先する）
+  // フェーズ23：就寝時間帯は、目的地が無い間の徘徊を止めてその場に留まらせる
+  // （生活サイクルの「就寝」を、見た目にも分かる形で表現するため）。
+  let isSleeping = false;
 
   function update(delta) {
     let isMoving;
@@ -40,6 +43,9 @@ export function createNPC({ homeX, homeZ, clothingColor, hatColor, radius = 4, s
         isMoving = false;
         targetFacing = facing;
       }
+    } else if (isSleeping) {
+      isMoving = false;
+      targetFacing = facing;
     } else {
       const result = wanderer.update(controller.group.position, delta);
       isMoving = result.isMoving;
@@ -84,11 +90,20 @@ export function createNPC({ homeX, homeZ, clothingColor, hatColor, radius = 4, s
     return Math.hypot(dx, dz) <= destination.arriveDistance;
   }
 
+  /**
+   * 就寝時間帯かどうかを設定する。trueの間は、目的地が無くても徘徊せず
+   * その場に留まる（populace.jsが時間帯に応じて呼ぶ）。
+   */
+  function setSleeping(value) {
+    isSleeping = value;
+  }
+
   return {
     group: controller.group,
     update,
     setDestination,
     clearDestination,
     hasArrivedAtDestination,
+    setSleeping,
   };
 }

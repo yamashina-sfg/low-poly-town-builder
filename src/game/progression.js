@@ -20,9 +20,9 @@ export function computeReputationScore({
   npcCount = 0,
   dogCount = 0,
 }) {
-  // NPC・犬の数は現状固定（プレイヤーの行動では増減しない）なので、重みを
-  // 低くして常に一定の下駄（baseline）程度に留め、進行の主役はプレイヤーが
-  // 実際に建てた建物の種類数・装飾の充実度になるようにする。
+  // フェーズ23よりNPCの数は満足度に応じて増減するようになったが、
+  // 重みは低いまま据え置き、進行の主役はプレイヤーが実際に建てた建物の
+  // 種類数・装飾の充実度になるようにする（犬の数は引き続き固定）。
   return distinctBuildingTypeCount * 15 + Math.min(decorationCount, 30) * 1 + npcCount * 1 + dogCount * 1;
 }
 

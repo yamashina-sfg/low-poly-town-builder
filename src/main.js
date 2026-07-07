@@ -56,7 +56,14 @@ import {
 } from './game/player.js';
 import { initBuildSystem, clearHoveredTile } from './game/buildSystem.js';
 import { initInteractions, updateInteractionTarget, handleActionKey } from './game/interactions.js';
-import { initPopulace, updatePopulace, resolvePopulaceInterCollisions } from './game/populace.js';
+import {
+  initPopulace,
+  updatePopulace,
+  resolvePopulaceInterCollisions,
+  serializePopulace,
+  restorePopulace,
+  updatePopulacePanel,
+} from './game/populace.js';
 import { showStatusMessage } from './game/statusMessage.js';
 import { updateResourcePanel } from './game/resourcePanel.js';
 import { updateProgression, recordLandmarkDiscovered, getCurrentLockedTypes } from './game/progression.js';
@@ -179,12 +186,12 @@ window.addEventListener('keydown', (event) => {
 // デバッグパネル・セーブ/ロード
 // ------------------------------------------------------------------
 function handleSave() {
-  saveWorld();
+  saveWorld(serializePopulace);
   showStatusMessage('セーブしました');
 }
 
 function handleLoad() {
-  const result = loadWorld();
+  const result = loadWorld(restorePopulace);
   if (!result) {
     showStatusMessage('セーブデータが見つからない');
     return;
@@ -268,6 +275,7 @@ function animate() {
     updateTimeAndSleepiness(formatGameTime(), Math.round(getSleepiness()));
     updateResourcePanel();
     updateProgression();
+    updatePopulacePanel();
     updateButtonStates({ lockedTypes: getCurrentLockedTypes(), wood: getWood(), money: getMoney() });
     fpsFrameCount = 0;
     fpsElapsed = 0;

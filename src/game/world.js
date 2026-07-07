@@ -620,15 +620,29 @@ export function updateWorldStreaming(worldX, worldZ) {
   });
 }
 
-export function saveWorld() {
-  saveTownToLocalStorage(forEachLoadedTile, worldSeed, { wood: getWood(), money: getMoney() });
+/**
+ * getPopulaceSnapshotは、populace.jsのserializePopulace（NPCの家・満足度
+ * などの配列）を呼ぶための関数。world.jsはpopulace.jsに依存できない
+ * （populace.jsが既にworld.jsを使っているため、循環参照になる）ため、
+ * 呼び出し側(main.js)から注入してもらう。
+ */
+export function saveWorld(getPopulaceSnapshot) {
+  saveTownToLocalStorage(
+    forEachLoadedTile,
+    worldSeed,
+    { wood: getWood(), money: getMoney() },
+    getPopulaceSnapshot?.(),
+  );
 }
 
 /**
+ * restorePopulaceは、populace.jsのrestorePopulace（保存されていたNPCの
+ * 家・満足度から住民を作り直す関数）を呼び出し側(main.js)から注入する
+ * （saveWorldと同じ理由で、world.jsから直接populace.jsは呼べない）。
  * @returns {{ seed: number } | null} 読込に成功した場合は反映後のシード値、
  * セーブデータが存在しなければnull。
  */
-export function loadWorld() {
+export function loadWorld(restorePopulace) {
   const data = loadTownFromLocalStorage();
   if (!data) return null;
 
@@ -643,6 +657,10 @@ export function loadWorld() {
     if (!tile) return;
     handleRestoreTile(tile, cell.type, cell.furniture, cell.rotationY);
   });
+
+  // 住居セルが復元された後に呼ぶ必要がある（NPCの家をグローバルタイル
+  // 座標から引き直す際、対象タイルが既に復元済みでなければならないため）。
+  restorePopulace?.(data.populace);
 
   return { seed: worldSeed };
 }
