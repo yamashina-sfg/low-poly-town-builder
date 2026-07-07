@@ -1,5 +1,8 @@
+import * as THREE from 'three';
 import { describe, test, expect } from 'vitest';
-import { ROAD_TYPES, computeRoadConnections, findRoadPath } from './road.js';
+import { ROAD_TYPES, computeRoadConnections, findRoadPath, generateRoad } from './road.js';
+import { UNIT_BOX_POOL } from './instancing.js';
+import { UNIT_CYLINDER_POOL } from './primitives.js';
 
 // road.js の接続・経路探索はgetGlobalTile(gx,gy)という関数にしか依存しないため、
 // 実際のchunkManagerを使わず、シンプルなインメモリのタイル格子でテストできる。
@@ -85,5 +88,43 @@ describe('findRoadPath', () => {
     const houseTile = getGlobalTile(0, 0);
     const shopTile = getGlobalTile(6, 5);
     expect(findRoadPath(getGlobalTile, houseTile, shopTile)).toBeNull();
+  });
+});
+
+describe('generateRoad（橋の見た目、バグ修正の回帰テスト）', () => {
+  const noConnections = { N: false, S: false, E: false, W: false };
+  const tilePosition = new THREE.Vector3(0, 0, 0);
+
+  function countByPool(parts, poolKey) {
+    return parts.filter((part) => part.key === poolKey).length;
+  }
+
+  test('接続の無い孤立した橋タイルは、4面ではなく2面（進行方向の左右）だけに欄干を持つ（箱型にならない）', () => {
+    const { parts } = generateRoad(tilePosition, noConnections, { type: 'bridge', rotationY: 0 });
+    // デッキ1枚 + 欄干2本（左右のみ、前後は開けておく）
+    expect(countByPool(parts, UNIT_BOX_POOL)).toBe(1 + 2);
+    // 欄干2本 × 両端の柱2本 = 4本
+    expect(countByPool(parts, UNIT_CYLINDER_POOL)).toBe(4);
+  });
+
+  test('90度回転すると、欄干が付く辺（開いている進行方向）が入れ替わる', () => {
+    const straight = generateRoad(tilePosition, noConnections, { type: 'bridge', rotationY: 0 });
+    const rotated = generateRoad(tilePosition, noConnections, {
+      type: 'bridge',
+      rotationY: Math.PI / 2,
+    });
+    // どちらも欄干の数自体は変わらない（常に2面だけ）
+    expect(countByPool(rotated.parts, UNIT_BOX_POOL)).toBe(countByPool(straight.parts, UNIT_BOX_POOL));
+    expect(countByPool(rotated.parts, UNIT_CYLINDER_POOL)).toBe(
+      countByPool(straight.parts, UNIT_CYLINDER_POOL),
+    );
+  });
+
+  test('実際に道・橋が接続している方向は、回転にかかわらず常に開ける（通行の妨げにしない）', () => {
+    // 南北(N/S)に道が繋がっている橋：回転していなくても、この方向には欄干を付けない。
+    const connectedNS = { N: true, S: true, E: false, W: false };
+    const { parts } = generateRoad(tilePosition, connectedNS, { type: 'bridge', rotationY: 0 });
+    // 接続方向(N/S)は開けたまま、E/Wのみ欄干（デッキ1 + 欄干2本）
+    expect(countByPool(parts, UNIT_BOX_POOL)).toBe(1 + 2);
   });
 });

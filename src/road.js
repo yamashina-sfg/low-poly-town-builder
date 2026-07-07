@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { addInstance, UNIT_BOX_POOL } from './instancing.js';
+import { UNIT_CYLINDER_POOL } from './primitives.js';
 import { TILE_SIZE } from './terrain.js';
+import { WOOD_COLOR } from './palette.js';
 
 const ZERO_ROTATION = new THREE.Euler(0, 0, 0);
 
@@ -99,42 +101,86 @@ function generatePlainRoad(tilePosition, connections, { animate = false, type = 
   return { kind: 'instances', parts };
 }
 
-const BRIDGE_DECK_COLOR = new THREE.Color(0x9c7a4a);
-const BRIDGE_RAIL_COLOR = new THREE.Color(0x6b4a34);
+const BRIDGE_DECK_COLOR = new THREE.Color(WOOD_COLOR);
+const BRIDGE_RAIL_COLOR = new THREE.Color(0x5c3c26); // デッキよりやや濃い木の色
+// デッキは道路の土台(y=0〜0.02)に近い高さにして、隣接する道・地面との
+// 段差が目立たないようにする。
+const DECK_BOTTOM_Y = 0.02;
+const DECK_HEIGHT = 0.08;
+const DECK_TOP_Y = DECK_BOTTOM_Y + DECK_HEIGHT;
+const RAIL_HEIGHT = 0.34;
+const RAIL_THICKNESS = 0.07;
 
 /**
- * 橋：水の上に架ける道。タイル全面を覆う板張りの床に、道が続いていない
- * （＝水に面している）側にだけ欄干を立てる。道が続く側は開けておくことで、
- * 陸の道・他の橋タイルと違和感なくつながって見える。
+ * 橋：水の上に架ける道。タイル全面を覆う薄い板張りの床（隣接する道・地面と
+ * 高さが揃うよう低めに配置）に、進行方向の左右にだけ低い欄干を立てる
+ * （前後＝道が続く方向は開けておき、歩いて通り抜けられるようにする）。
+ * どちらを「左右」とするかはrotationY（フェーズ21のRキー回転）で決まり、
+ * 実際に道・橋が接続している方向は、回転にかかわらず常に開けておく。
  */
-function generateBridge(tilePosition, connections, { animate = false } = {}) {
+function generateBridge(tilePosition, connections, { animate = false, rotationY = 0 } = {}) {
   const parts = [];
 
+  // 床（デッキ）：正方形なので回転させても見た目は変わらないが、
+  // 他のジェネレーターとの一貫性のためrotationYはそのまま渡しておく。
   parts.push(
     addInstance(
       UNIT_BOX_POOL,
-      new THREE.Vector3(tilePosition.x, 0.15, tilePosition.z),
-      ZERO_ROTATION,
-      new THREE.Vector3(TILE_SIZE, 0.1, TILE_SIZE),
+      new THREE.Vector3(tilePosition.x, DECK_BOTTOM_Y, tilePosition.z),
+      new THREE.Euler(0, rotationY, 0),
+      new THREE.Vector3(TILE_SIZE, DECK_HEIGHT, TILE_SIZE),
       BRIDGE_DECK_COLOR,
       { animate },
     ),
   );
 
+  // rotationYを90度刻みのステップ数に変換し、南北(N/S)方向が「進行方向
+  // （＝欄干を付けない前後）」になるのを基準に、90度回転するごとに
+  // 東西(E/W)方向と入れ替える。
+  const rotationSteps = Math.round(rotationY / (Math.PI / 2)) % 4;
+  const isNorthSouthOpenByDefault = rotationSteps % 2 === 0;
+
   DIRECTIONS.forEach(({ key, dx, dz }) => {
-    if (connections[key]) return; // 道・橋が続く方向は欄干を空けておく
-    const isHorizontal = dx !== 0;
-    const railScale = isHorizontal
-      ? new THREE.Vector3(0.08, 0.3, TILE_SIZE)
-      : new THREE.Vector3(TILE_SIZE, 0.3, 0.08);
-    const position = new THREE.Vector3(
-      tilePosition.x + dx * TILE_SIZE * 0.48,
-      0.35,
-      tilePosition.z + dz * TILE_SIZE * 0.48,
+    const isNorthSouth = dx === 0;
+    const isOpenByRotation = isNorthSouth === isNorthSouthOpenByDefault;
+    // 道・橋が実際に接続している方向は、回転の向きに関係なく常に開けておく
+    // （通行の妨げにならないようにする）。
+    if (isOpenByRotation || connections[key]) return;
+
+    const isHorizontalEdge = dx !== 0; // 東西の縁＝南北方向に伸びる欄干
+    const railScale = isHorizontalEdge
+      ? new THREE.Vector3(RAIL_THICKNESS, RAIL_HEIGHT, TILE_SIZE * 0.92)
+      : new THREE.Vector3(TILE_SIZE * 0.92, RAIL_HEIGHT, RAIL_THICKNESS);
+    const railPosition = new THREE.Vector3(
+      tilePosition.x + dx * TILE_SIZE * 0.46,
+      DECK_TOP_Y,
+      tilePosition.z + dz * TILE_SIZE * 0.46,
     );
     parts.push(
-      addInstance(UNIT_BOX_POOL, position, ZERO_ROTATION, railScale, BRIDGE_RAIL_COLOR, { animate }),
+      addInstance(UNIT_BOX_POOL, railPosition, ZERO_ROTATION, railScale, BRIDGE_RAIL_COLOR, { animate }),
     );
+
+    // 欄干の両端に、細い柱を1本ずつ立てて橋らしいディテールを加える。
+    const postOffset = isHorizontalEdge
+      ? new THREE.Vector3(0, 0, TILE_SIZE * 0.46)
+      : new THREE.Vector3(TILE_SIZE * 0.46, 0, 0);
+    [-1, 1].forEach((sign) => {
+      const postPosition = new THREE.Vector3(
+        railPosition.x + postOffset.x * sign,
+        DECK_TOP_Y,
+        railPosition.z + postOffset.z * sign,
+      );
+      parts.push(
+        addInstance(
+          UNIT_CYLINDER_POOL,
+          postPosition,
+          ZERO_ROTATION,
+          new THREE.Vector3(0.06, RAIL_HEIGHT * 1.15, 0.06),
+          BRIDGE_RAIL_COLOR,
+          { animate },
+        ),
+      );
+    });
   });
 
   return { kind: 'instances', parts };
@@ -145,8 +191,12 @@ function generateBridge(tilePosition, connections, { animate = false } = {}) {
  * 見た目を切り替える。いずれも接続方向(connections)から自動的に見た目が決まる。
  * @returns {{ kind: 'instances', parts: Array<{key: string, index: number}> }}
  */
-export function generateRoad(tilePosition, connections, { animate = false, type = 'road' } = {}) {
-  if (type === 'bridge') return generateBridge(tilePosition, connections, { animate });
+export function generateRoad(
+  tilePosition,
+  connections,
+  { animate = false, type = 'road', rotationY = 0 } = {},
+) {
+  if (type === 'bridge') return generateBridge(tilePosition, connections, { animate, rotationY });
   return generatePlainRoad(tilePosition, connections, { animate, type });
 }
 

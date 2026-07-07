@@ -273,7 +273,7 @@ export function buildOnTile(tile, type, { animate = true, rotationY = 0 } = {}) 
     tile.userData.object = { kind: 'mesh', object3D };
   } else if (ROAD_TYPES.has(type)) {
     const connections = computeRoadConnections(getGlobalTile, globalX, globalY);
-    tile.userData.object = generateRoad(tile.position, connections, { animate, type });
+    tile.userData.object = generateRoad(tile.position, connections, { animate, type, rotationY });
   }
 
   trackInteractiveTile(tile, type);
