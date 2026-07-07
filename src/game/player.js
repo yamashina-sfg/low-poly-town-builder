@@ -119,7 +119,11 @@ export function updateMovementInput(delta) {
   turnInput = THREE.MathUtils.clamp(turnInput, -1, 1);
 
   if (turnInput !== 0) {
-    characterFacing += turnInput * TURN_SPEED * delta;
+    // カメラは常にキャラの背後にあるため、画面上の「右」はワールド座標の
+    // +X方向ではなく-X方向に対応する。そのためDキー(turnInput=+1)は
+    // characterFacingを増やすのではなく減らす向きに適用し、画面右へ
+    // 旋回するようにする（逆にするとDで画面左を向いてしまう）。
+    characterFacing -= turnInput * TURN_SPEED * delta;
     // 長時間旋回し続けても値が際限なく増え続けないよう -π〜πに正規化する。
     characterFacing = Math.atan2(Math.sin(characterFacing), Math.cos(characterFacing));
     character.rotation.y = characterFacing;
