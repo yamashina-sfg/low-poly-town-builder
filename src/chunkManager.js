@@ -73,12 +73,17 @@ export function getProceduralTileType(worldSeed, globalX, globalY) {
 
 /**
  * チャンク内のタイルのうち、自然生成の下地と異なるものだけを
- * { x, y, type, furniture? } の配列として抜き出す。
+ * { x, y, type, furniture?, rotationY?, condition?, shopInventory? } の
+ * 配列として抜き出す。condition（維持費未払いによる老朽化）・
+ * shopInventory（お店の在庫）は、チャンクをまたいで離れて戻ってきたときに
+ * リセットされてしまわないよう、フェーズ25でこの差分キャッシュにも含める
+ * ようにした。
  */
 function computeChunkDiff(chunk, worldSeed) {
   const cells = [];
   chunk.tiles.forEach((tile) => {
-    const { globalX, globalY, tileType, indoorFurniture, rotationY } = tile.userData;
+    const { globalX, globalY, tileType, indoorFurniture, rotationY, condition, shopInventory } =
+      tile.userData;
     const baseType = getProceduralTileType(worldSeed, globalX, globalY);
     if (tileType !== baseType) {
       const cell = { x: globalX, y: globalY, type: tileType };
@@ -86,6 +91,8 @@ function computeChunkDiff(chunk, worldSeed) {
         cell.furniture = indoorFurniture;
       }
       if (rotationY) cell.rotationY = rotationY;
+      if (Number.isFinite(condition)) cell.condition = condition;
+      if (Number.isFinite(shopInventory)) cell.shopInventory = shopInventory;
       cells.push(cell);
     }
   });
@@ -96,8 +103,9 @@ function computeChunkDiff(chunk, worldSeed) {
  * 指定チャンクが未生成なら生成する。生成済みなら何もせず既存のチャンクを返す
  * （何度呼んでも安全）。
  * onProceduralTile(tile, type)は自然生成で木などが配置されるタイルに対して呼ばれる。
- * onRestoreTile(tile, type, furniture, rotationY)は、以前アンロードされ差分
- * キャッシュに残っていたタイル（プレイヤーが手を加えたもの）を復元するときに呼ばれる。
+ * onRestoreTile(tile, cell)は、以前アンロードされ差分キャッシュに残っていた
+ * タイル（プレイヤーが手を加えたもの）を復元するときに、そのセルの内容
+ * { type, furniture?, rotationY?, condition?, shopInventory? }ごと呼ばれる。
  */
 export function ensureChunkExists(cx, cy, { worldSeed, onProceduralTile, onRestoreTile }) {
   const key = chunkKey(cx, cy);
@@ -125,7 +133,7 @@ export function ensureChunkExists(cx, cy, { worldSeed, onProceduralTile, onResto
     cachedDiff.forEach((cell) => {
       const tile = globalTileIndex.get(tileKey(cell.x, cell.y));
       if (tile && onRestoreTile) {
-        onRestoreTile(tile, cell.type, cell.furniture, cell.rotationY);
+        onRestoreTile(tile, cell);
       }
     });
   }

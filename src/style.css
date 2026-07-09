@@ -145,6 +145,26 @@ canvas {
   background: #ffffff;
 }
 
+.shop-panel button:disabled {
+  background: rgba(255, 255, 255, 0.4);
+  color: rgba(34, 51, 34, 0.6);
+  cursor: not-allowed;
+}
+
+/* フェーズ25：維持費未払いで老朽化し、非稼働になったお店 */
+.shop-status-closed {
+  margin: 0;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(201, 76, 76, 0.85);
+  color: #fff;
+  font-size: 12px;
+}
+
+.shop-status-closed.hidden {
+  display: none;
+}
+
 .sleepiness-row {
   display: flex;
   align-items: center;

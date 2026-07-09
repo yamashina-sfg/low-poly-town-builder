@@ -3,6 +3,7 @@ import {
   BUILD_COSTS,
   getWood,
   getMoney,
+  getFood,
   setResources,
   canAfford,
   pay,
@@ -10,11 +11,13 @@ import {
   trySpendMoney,
   addMoney,
   trySpendWood,
+  addFood,
+  trySpendFood,
   getTotalWoodCollected,
 } from './economy.js';
 
 beforeEach(() => {
-  setResources({ wood: 20, money: 100 });
+  setResources({ wood: 20, money: 100, food: 0 });
 });
 
 describe('canAfford / pay', () => {
@@ -92,5 +95,33 @@ describe('getTotalWoodCollected（フェーズ19: 実績「木材を100集めた
     expect(getTotalWoodCollected()).toBe(before + 7);
     trySpendWood(7);
     expect(getTotalWoodCollected()).toBe(before + 7); // 所持数は減るが累計は変わらない
+  });
+});
+
+describe('食料（フェーズ25: 畑が生産するリソース）', () => {
+  test('addFood/trySpendFoodはwood/moneyと同様に動作する', () => {
+    expect(getFood()).toBe(0);
+    addFood(5);
+    expect(getFood()).toBe(5);
+    expect(trySpendFood(3)).toBe(true);
+    expect(getFood()).toBe(2);
+    expect(trySpendFood(10)).toBe(false);
+    expect(getFood()).toBe(2);
+  });
+
+  test('setResourcesはfoodも復元できる（不正な値は無視、負の値は0にクランプ）', () => {
+    setResources({ wood: 20, money: 100, food: 12 });
+    expect(getFood()).toBe(12);
+    setResources({ food: Number.NaN });
+    expect(getFood()).toBe(12);
+    setResources({ food: -5 });
+    expect(getFood()).toBe(0);
+  });
+});
+
+describe('BUILD_COSTS（フェーズ25: 生産施設のコスト）', () => {
+  test('farm・loggingHutにもwood/moneyコストが定義されている', () => {
+    expect(BUILD_COSTS.farm).toEqual({ wood: 15, money: 30 });
+    expect(BUILD_COSTS.loggingHut).toEqual({ wood: 10, money: 25 });
   });
 });

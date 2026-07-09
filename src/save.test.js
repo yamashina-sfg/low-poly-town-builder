@@ -17,6 +17,15 @@ function makeFakeTiles() {
         globalY: 2,
         tileType: 'house',
         indoorFurniture: ['bed', null, null, null, null, null, null, null, null],
+        condition: 62,
+      },
+    },
+    {
+      userData: {
+        globalX: 3,
+        globalY: 3,
+        tileType: 'shop',
+        shopInventory: 8,
       },
     },
   ];
@@ -68,6 +77,17 @@ describe('serializeTown', () => {
     });
     expect(withoutPopulace.populace).toEqual([]);
   });
+
+  test('フェーズ25：condition（老朽化の状態）・shopInventory（お店の在庫）を含む', () => {
+    const tiles = makeFakeTiles();
+    const data = serializeTown((cb) => forEachFakeTile(tiles, cb), WORLD_SEED, { wood: 5, money: 10 });
+    const houseCell = data.cells.find((c) => c.x === 2 && c.y === 2);
+    expect(houseCell.condition).toBe(62);
+
+    const shopCell = data.cells.find((c) => c.x === 3 && c.y === 3);
+    expect(shopCell.type).toBe('shop');
+    expect(shopCell.shopInventory).toBe(8);
+  });
 });
 
 describe('localStorageへの保存・読込', () => {
@@ -90,6 +110,14 @@ describe('localStorageへの保存・読込', () => {
     saveTownToLocalStorage((cb) => forEachFakeTile(tiles, cb), WORLD_SEED, { wood: 5, money: 10 }, populace);
     const loaded = loadTownFromLocalStorage();
     expect(loaded.populace).toEqual(populace);
+  });
+
+  test('フェーズ25：condition・shopInventoryも往復一致する', () => {
+    const tiles = makeFakeTiles();
+    saveTownToLocalStorage((cb) => forEachFakeTile(tiles, cb), WORLD_SEED, { wood: 5, money: 10 });
+    const loaded = loadTownFromLocalStorage();
+    expect(loaded.cells.find((c) => c.x === 2 && c.y === 2).condition).toBe(62);
+    expect(loaded.cells.find((c) => c.x === 3 && c.y === 3).shopInventory).toBe(8);
   });
 
   test('セーブデータが存在しなければnullを返す', () => {

@@ -123,7 +123,10 @@ export function addInstance(key, position, rotation, scale, color, { animate = f
     });
   }
 
-  return { key, index };
+  // colorも一緒に持たせておく（フェーズ25：建物の老朽化演出で、元の色味を
+  // 保ったまま「くすませた」色を計算するために、パーツごとの元の色を
+  // 必要とするため）。
+  return { key, index, color: color ? color.clone() : null };
 }
 
 /**

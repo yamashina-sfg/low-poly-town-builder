@@ -1,6 +1,9 @@
-// 所持リソース（木材・お金）と建築コストを管理する。
+// 所持リソース（木材・お金・食料）と建築コストを管理する。
 let wood = 20;
 let money = 100;
+// フェーズ25：畑が生産する食料。現時点では消費先（人口の食事など）は
+// 無く、生産施設の成果を示す蓄積型のリソースとして扱う。
+let food = 0;
 // 実績（フェーズ19）用に、これまで伐採・入手した木材の累計を別途記録する
 // （現在の所持数とは異なり、使っても減らない一方向のカウンター）。
 let totalWoodCollected = 0;
@@ -11,6 +14,10 @@ export const BUILD_COSTS = {
   well: { wood: 5, money: 10 },
   warehouse: { wood: 30, money: 40 },
   windmill: { wood: 25, money: 60 },
+  // フェーズ25：生産施設。伐採小屋は木材で作るのに木材を生み出す
+  // （元は取れる）投資、畑は安価だが食料しか生まない。
+  farm: { wood: 15, money: 30 },
+  loggingHut: { wood: 10, money: 25 },
   bed: { wood: 10, money: 0 },
   table: { wood: 6, money: 0 },
   chair: { wood: 3, money: 0 },
@@ -36,12 +43,17 @@ export function getMoney() {
   return money;
 }
 
+export function getFood() {
+  return food;
+}
+
 /**
  * セーブデータからの復元用。不正な値は無視して現状を維持する。
  */
-export function setResources({ wood: nextWood, money: nextMoney } = {}) {
+export function setResources({ wood: nextWood, money: nextMoney, food: nextFood } = {}) {
   if (Number.isFinite(nextWood)) wood = Math.max(0, nextWood);
   if (Number.isFinite(nextMoney)) money = Math.max(0, nextMoney);
+  if (Number.isFinite(nextFood)) food = Math.max(0, nextFood);
 }
 
 /**
@@ -91,5 +103,15 @@ export function addMoney(amount) {
 export function trySpendWood(amount) {
   if (wood < amount) return false;
   wood -= amount;
+  return true;
+}
+
+export function addFood(amount) {
+  food += amount;
+}
+
+export function trySpendFood(amount) {
+  if (food < amount) return false;
+  food -= amount;
   return true;
 }

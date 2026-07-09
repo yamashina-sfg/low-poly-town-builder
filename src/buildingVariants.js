@@ -5,6 +5,7 @@ import {
   UNIT_BOX_POOL,
   UNIT_CONE_SQUARE_POOL,
   UNIT_CYLINDER_POOL,
+  UNIT_SPHERE_POOL,
   offsetPosition,
   rotatedEuler,
 } from './primitives.js';
@@ -20,6 +21,11 @@ import {
   WINDMILL_ROOF_COLOR,
   RUINS_COLOR,
   RUINS_MOSS_COLOR,
+  SOIL_COLOR,
+  FARM_CROP_COLORS,
+  LOGGING_HUT_WALL_COLOR,
+  LOGGING_HUT_ROOF_COLOR,
+  LOG_PILE_COLOR,
 } from './palette.js';
 
 const FLOOR_HEIGHT = 0.7;
@@ -193,6 +199,98 @@ export function generateWindmill(seed, tilePosition, { animate = true, rotationY
         rotatedEuler(rotationY, 0, 0, angle),
         new THREE.Vector3(0.12, 0.9, 0.04),
         bladeColor,
+        { animate },
+      ),
+    );
+  });
+
+  return { kind: 'instances', parts };
+}
+
+/**
+ * 畑：耕した土のタイルに、色違いの作物を3x3の格子状に植える
+ * （フェーズ25：生産施設。時間経過で食料を生産する）。
+ */
+export function generateFarm(seed, tilePosition, { animate = true, rotationY = 0 } = {}) {
+  const rng = mulberry32(seed);
+  const parts = [];
+
+  const soilColor = new THREE.Color(SOIL_COLOR);
+  parts.push(
+    addInstance(
+      UNIT_BOX_POOL,
+      offsetPosition(tilePosition, 0, 0, 0, rotationY),
+      rotatedEuler(rotationY),
+      new THREE.Vector3(1.7, 0.06, 1.7),
+      soilColor,
+      { animate },
+    ),
+  );
+
+  const rows = [-0.5, 0, 0.5];
+  rows.forEach((offsetZ) => {
+    rows.forEach((offsetX) => {
+      const cropColor = new THREE.Color(pick(rng, FARM_CROP_COLORS));
+      const cropHeight = 0.14 + rng() * 0.08;
+      parts.push(
+        addInstance(
+          UNIT_SPHERE_POOL,
+          offsetPosition(tilePosition, offsetX, 0.06, offsetZ, rotationY),
+          rotatedEuler(rotationY),
+          new THREE.Vector3(0.16, cropHeight, 0.16),
+          cropColor,
+          { animate },
+        ),
+      );
+    });
+  });
+
+  return { kind: 'instances', parts };
+}
+
+/**
+ * 伐採小屋：木造の小さな小屋＋積み上げた丸太の山
+ * （フェーズ25：生産施設。時間経過で木材を生産する）。
+ */
+export function generateLoggingHut(seed, tilePosition, { animate = true, rotationY = 0 } = {}) {
+  const parts = [];
+  const wallColor = new THREE.Color(LOGGING_HUT_WALL_COLOR);
+  const width = 0.9;
+  const height = 0.6;
+
+  parts.push(
+    addInstance(
+      UNIT_BOX_POOL,
+      offsetPosition(tilePosition, -0.35, 0, 0, rotationY),
+      rotatedEuler(rotationY),
+      new THREE.Vector3(width, height, width),
+      wallColor,
+      { animate },
+    ),
+  );
+
+  const roofColor = new THREE.Color(LOGGING_HUT_ROOF_COLOR);
+  parts.push(
+    addInstance(
+      UNIT_CONE_SQUARE_POOL,
+      offsetPosition(tilePosition, -0.35, height, 0, rotationY),
+      rotatedEuler(rotationY, 0, Math.PI / 4, 0),
+      new THREE.Vector3(width * 1.1, 0.4, width * 1.1),
+      roofColor,
+      { animate },
+    ),
+  );
+
+  // 積み上げた丸太（水平に寝かせた円柱を2段）。
+  const logColor = new THREE.Color(LOG_PILE_COLOR);
+  [0.12, 0.24].forEach((logY) => {
+    parts.push(
+      addInstance(
+        UNIT_CYLINDER_POOL,
+        offsetPosition(tilePosition, 0.45, logY, 0, rotationY),
+        rotatedEuler(rotationY, 0, 0, Math.PI / 2),
+        new THREE.Vector3(0.1, 0.7, 0.1),
+        logColor,
         { animate },
       ),
     );

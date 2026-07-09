@@ -51,3 +51,14 @@ export const RUINS_MOSS_COLOR = 0x6b7a5c;
 // 特殊な木：資源が豊富な、金色がかった巨木
 export const SPECIAL_TREE_TRUNK_COLOR = 0x7a5a3a;
 export const SPECIAL_TREE_LEAF_COLOR = 0xc9a227;
+
+// フェーズ25：生産施設（畑・伐採小屋）
+export const FARM_CROP_COLORS = [0x6b8e3d, 0xc9a227, 0x8ea23d];
+export const LOGGING_HUT_WALL_COLOR = 0x7a5c3f;
+export const LOGGING_HUT_ROOF_COLOR = 0x4a3626;
+export const LOG_PILE_COLOR = 0x9a6a3f;
+
+// フェーズ25：維持費を払えない建物が老朽化したときに寄せる、くすんだ色。
+// 元の色とこの色を条件(condition)に応じて混ぜ合わせることで、
+// 完全に元の色味を失わずに「くすんで見える」演出にする。
+export const DECAY_TINT_COLOR = 0x3a352c;

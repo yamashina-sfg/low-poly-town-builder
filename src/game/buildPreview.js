@@ -14,6 +14,8 @@ const PREVIEW_FOOTPRINTS = {
   well: { width: 0.7, height: 1.3, depth: 0.7 },
   warehouse: { width: 1.8, height: 1.1, depth: 1.5 },
   windmill: { width: 0.6, height: 2.4, depth: 0.6 },
+  farm: { width: 1.7, height: 0.3, depth: 1.7 },
+  loggingHut: { width: 1.4, height: 1.0, depth: 1.4 },
   fence: { width: 1.8, height: 0.5, depth: 0.3 },
   streetlamp: { width: 0.3, height: 1.7, depth: 0.3 },
   bench: { width: 1.2, height: 0.6, depth: 0.5 },

@@ -68,6 +68,7 @@
     <div id="resource-panel" class="resource-panel">
       <div>🪵 <span id="resource-wood">0</span></div>
       <div>💰 <span id="resource-money">0</span></div>
+      <div>🌾 <span id="resource-food">0</span></div>
     </div>
     <canvas id="minimap-canvas" class="minimap" width="150" height="150"></canvas>
     <div id="touch-joystick" class="touch-joystick hidden">
@@ -76,6 +77,8 @@
     <div id="shop-panel" class="shop-panel hidden">
       <h3>お店</h3>
       <p>木材: <span id="shop-wood">0</span> ／ お金: <span id="shop-money">0</span></p>
+      <p>在庫: <span id="shop-inventory">0</span></p>
+      <p id="shop-status-closed" class="shop-status-closed hidden">🔧 修繕中のため営業していません</p>
       <div class="shop-buttons">
         <button type="button" id="shop-sell-wood">木材10を売る (+15円)</button>
         <button type="button" id="shop-buy-wood">木材10を買う (-20円)</button>
@@ -128,7 +131,11 @@
         <button type="button" data-type="shop">お店</button>
         <button type="button" data-type="well">井戸</button>
         <button type="button" data-type="warehouse">倉庫</button>
-        <button type="button" data-type="windmill" class="locked" disabled>風車（評判30で解放）</button>
+        <button type="button" data-type="farm">畑</button>
+        <button type="button" data-type="loggingHut">伐採小屋</button>
+        <button type="button" data-type="windmill" class="locked" disabled>
+          風車（町ランク「町」で解放）
+        </button>
       </div>
       <div class="build-menu-panel hidden" data-panel="furniture">
         <button type="button" data-type="bed">ベッド</button>
@@ -142,7 +149,9 @@
         <button type="button" data-type="bench">ベンチ</button>
         <button type="button" data-type="flowerbed">花壇</button>
         <button type="button" data-type="signpost">看板</button>
-        <button type="button" data-type="statue" class="locked" disabled>銅像（評判50で解放）</button>
+        <button type="button" data-type="statue" class="locked" disabled>
+          銅像（町ランク「都市」で解放）
+        </button>
       </div>
       <div class="build-menu-panel hidden" data-panel="terrain">
         <button type="button" data-type="tree">木</button>

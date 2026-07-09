@@ -4,10 +4,19 @@ import { resetSleepiness } from '../playerStatus.js';
 import { addWood, trySpendWood, addMoney, trySpendMoney, getWood, getMoney } from '../economy.js';
 import { spawnParticleBurst } from '../particles.js';
 import { getBedTiles, getTreeTiles, getShopTiles, buildOnTile } from './world.js';
+import {
+  isBuildingFunctional,
+  canBuyFromShop,
+  buyFromShop,
+  sellToShop,
+  getShopInventory,
+} from './economySystem.js';
 import { showStatusMessage } from './statusMessage.js';
 
 // タイル間隔(TILE_SIZE=2)より広く取り、隣のタイルに置いたものにも反応するようにする
 export const INTERACTION_RANGE = 2.5;
+// お店との取引1回あたりの木材量（フェーズ25：在庫もこの単位で増減する）。
+const SHOP_TRADE_AMOUNT = 10;
 
 const ACTION_PROMPT_LABELS = {
   bed: 'Eキーで眠る',
@@ -19,6 +28,9 @@ let sceneRef = null;
 let getCharacterPosition = null;
 // 現在キャラが操作できる対象（ベッド/木/お店のうち最も近いもの）
 let interactionTarget = null;
+// 現在開いているお店のタイル（フェーズ25：在庫・営業状態はお店ごとに持つため、
+// どのタイルを開いたか覚えておく必要がある）。
+let openShopTile = null;
 
 export function initInteractions({ scene, getCharacterPosition: getPositionFn }) {
   sceneRef = scene;
@@ -27,22 +39,32 @@ export function initInteractions({ scene, getCharacterPosition: getPositionFn })
   document.getElementById('action-prompt').addEventListener('click', handleActionKey);
   document.getElementById('shop-close').addEventListener('click', closeShop);
   document.getElementById('shop-sell-wood').addEventListener('click', () => {
-    if (trySpendWood(10)) {
+    if (!openShopTile) return;
+    if (!isBuildingFunctional(openShopTile)) {
+      showStatusMessage('このお店は維持費未払いで修繕中…営業していない');
+    } else if (trySpendWood(SHOP_TRADE_AMOUNT)) {
       addMoney(15);
+      sellToShop(openShopTile, SHOP_TRADE_AMOUNT);
       showStatusMessage('木材10を売って15円手に入れた');
     } else {
       showStatusMessage('木材が足りない');
     }
-    openShop();
+    openShop(openShopTile);
   });
   document.getElementById('shop-buy-wood').addEventListener('click', () => {
-    if (trySpendMoney(20)) {
-      addWood(10);
+    if (!openShopTile) return;
+    if (!isBuildingFunctional(openShopTile)) {
+      showStatusMessage('このお店は維持費未払いで修繕中…営業していない');
+    } else if (!canBuyFromShop(openShopTile, SHOP_TRADE_AMOUNT)) {
+      showStatusMessage('在庫が足りない…また今度来てください');
+    } else if (trySpendMoney(20)) {
+      addWood(SHOP_TRADE_AMOUNT);
+      buyFromShop(openShopTile, SHOP_TRADE_AMOUNT);
       showStatusMessage('木材10を買った');
     } else {
       showStatusMessage('お金が足りない');
     }
-    openShop();
+    openShop(openShopTile);
   });
 }
 
@@ -102,21 +124,36 @@ function chopTree(tile) {
   showStatusMessage(isSpecial ? `特殊な木から木材を${amount}個手に入れた！` : `木材を${amount}個手に入れた`);
 }
 
-function openShop() {
+/**
+ * お店を開く（フェーズ25：お店ごとの在庫・営業状態を反映する）。
+ * 老朽化して非稼働のお店は取引ボタンを両方とも無効にし、稼働中でも
+ * 在庫がSHOP_TRADE_AMOUNT未満なら「買う」だけ無効にする
+ * （「売る」は在庫を増やす側なので、稼働してさえいれば常に可能）。
+ */
+function openShop(tile) {
+  openShopTile = tile;
   document.getElementById('shop-wood').textContent = getWood();
   document.getElementById('shop-money').textContent = getMoney();
+  document.getElementById('shop-inventory').textContent = getShopInventory(tile);
+
+  const functional = isBuildingFunctional(tile);
+  document.getElementById('shop-status-closed').classList.toggle('hidden', functional);
+  document.getElementById('shop-buy-wood').disabled = !canBuyFromShop(tile, SHOP_TRADE_AMOUNT);
+  document.getElementById('shop-sell-wood').disabled = !functional;
+
   document.getElementById('shop-panel').classList.remove('hidden');
 }
 
 function closeShop() {
   document.getElementById('shop-panel').classList.add('hidden');
+  openShopTile = null;
 }
 
 export function handleActionKey() {
   if (!interactionTarget) return;
   if (interactionTarget.type === 'bed') sleep();
   else if (interactionTarget.type === 'tree') chopTree(interactionTarget.tile);
-  else if (interactionTarget.type === 'shop') openShop();
+  else if (interactionTarget.type === 'shop') openShop(interactionTarget.tile);
 }
 
 /**

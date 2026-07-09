@@ -17,6 +17,8 @@ import {
   generateWarehouse,
   generateWindmill,
   generateRuins,
+  generateFarm,
+  generateLoggingHut,
 } from '../buildingVariants.js';
 import { generateBed, generateTable, generateChair, generateFireplace } from '../furniture.js';
 import {
@@ -46,6 +48,8 @@ const PROCEDURAL_GENERATORS = {
   well: { generate: generateWell, salt: 700000 },
   warehouse: { generate: generateWarehouse, salt: 800000 },
   windmill: { generate: generateWindmill, salt: 1900000 },
+  farm: { generate: generateFarm, salt: 2200000 },
+  loggingHut: { generate: generateLoggingHut, salt: 2300000 },
   tree: { generate: (seed, pos, opts) => generateTree(seed, undefined, pos, opts), salt: 500000 },
   specialTree: { generate: generateSpecialTree, salt: 2000000 },
   ruins: { generate: generateRuins, salt: 2100000 },
@@ -61,7 +65,32 @@ const PROCEDURAL_GENERATORS = {
   statue: { generate: generateStatue, salt: 1800000 },
 };
 
-export const BUILDING_TYPES = new Set(['house', 'shop', 'well', 'warehouse', 'windmill']);
+export const BUILDING_TYPES = new Set([
+  'house',
+  'shop',
+  'well',
+  'warehouse',
+  'windmill',
+  'farm',
+  'loggingHut',
+]);
+// フェーズ25：維持費がかかる（払えないと老朽化する）建物の種類と、
+// 一定時間ごとに資材を生産する種類。どちらもBUILDING_TYPESの部分集合。
+export const MAINTAINED_BUILDING_TYPES = new Set([
+  'house',
+  'shop',
+  'well',
+  'warehouse',
+  'windmill',
+  'farm',
+  'loggingHut',
+]);
+export const PRODUCTION_TYPES = new Set(['farm', 'loggingHut']);
+// 建物の状態(condition)・お店の在庫(shopInventory)の初期値であり、同時に
+// それぞれの取りうる最大値でもある（economySystem.jsの生産・補充・修繕の
+// 上限として再利用する）。
+export const DEFAULT_BUILDING_CONDITION = 100;
+export const DEFAULT_SHOP_INVENTORY = 30;
 export const FURNITURE_TYPES = new Set(['bed', 'table', 'chair', 'fireplace']);
 export const DECORATION_TYPES = new Set(['fence', 'streetlamp', 'bench', 'flowerbed', 'signpost', 'statue']);
 // 建物・装飾（＝地形ではないもの）は、既に何か置かれているタイルには重ねて
@@ -298,6 +327,20 @@ export function buildOnTile(tile, type, { animate = true, rotationY = 0 } = {}) 
     tile.userData.indoorFurniture = undefined;
   }
 
+  // フェーズ25：維持費のかかる建物は「状態(condition, 0〜100)」を持ち、
+  // お店はさらに「在庫(shopInventory)」を持つ。既存の値があれば
+  // 引き継ぐ（建て直しても老朽化・在庫の状態はリセットされない）。
+  if (MAINTAINED_BUILDING_TYPES.has(type)) {
+    tile.userData.condition = tile.userData.condition ?? DEFAULT_BUILDING_CONDITION;
+  } else {
+    tile.userData.condition = undefined;
+  }
+  if (type === 'shop') {
+    tile.userData.shopInventory = tile.userData.shopInventory ?? DEFAULT_SHOP_INVENTORY;
+  } else {
+    tile.userData.shopInventory = undefined;
+  }
+
   const { globalX, globalY } = tile.userData;
   const generatorEntry = PROCEDURAL_GENERATORS[type];
 
@@ -385,12 +428,19 @@ export function removeTileContent(tile) {
  * 移動元が橋だった場合は、そこは水タイルに戻る（フェーズ22）。
  */
 export function moveTileContent(fromTile, toTile, rotationYOverride) {
-  const { tileType, rotationY, indoorFurniture } = fromTile.userData;
+  const { tileType, rotationY, indoorFurniture, condition, shopInventory } = fromTile.userData;
   const finalRotationY = rotationYOverride ?? rotationY ?? 0;
   buildOnTile(fromTile, getVacatedType(tileType));
   buildOnTile(toTile, tileType, { rotationY: finalRotationY });
   if (tileType === 'house' && Array.isArray(indoorFurniture)) {
     toTile.userData.indoorFurniture = indoorFurniture.slice();
+  }
+  // 老朽化の状態・お店の在庫は、移動しても引き継ぐ（建て直しではないため）。
+  if (MAINTAINED_BUILDING_TYPES.has(tileType) && Number.isFinite(condition)) {
+    toTile.userData.condition = condition;
+  }
+  if (tileType === 'shop' && Number.isFinite(shopInventory)) {
+    toTile.userData.shopInventory = shopInventory;
   }
 }
 
@@ -419,10 +469,17 @@ function handleProceduralTile(tile, type) {
  * 加えたもの）を、チャンク再訪時に復元する。セーブデータ読込時のセル
  * 復元とも共通のロジック。
  */
-function handleRestoreTile(tile, type, furniture, rotationY = 0) {
+function handleRestoreTile(tile, cell) {
+  const { type, furniture, rotationY = 0, condition, shopInventory } = cell;
   buildOnTile(tile, type, { animate: false, rotationY });
   if (type === 'house' && Array.isArray(furniture)) {
     tile.userData.indoorFurniture = furniture.slice();
+  }
+  if (MAINTAINED_BUILDING_TYPES.has(type) && Number.isFinite(condition)) {
+    tile.userData.condition = condition;
+  }
+  if (type === 'shop' && Number.isFinite(shopInventory)) {
+    tile.userData.shopInventory = shopInventory;
   }
 }
 
@@ -655,7 +712,7 @@ export function loadWorld(restorePopulace) {
     ensureChunkForGlobalTile(cell.x, cell.y, { worldSeed, onProceduralTile: handleProceduralTile });
     const tile = getGlobalTile(cell.x, cell.y);
     if (!tile) return;
-    handleRestoreTile(tile, cell.type, cell.furniture, cell.rotationY);
+    handleRestoreTile(tile, cell);
   });
 
   // 住居セルが復元された後に呼ぶ必要がある（NPCの家をグローバルタイル
