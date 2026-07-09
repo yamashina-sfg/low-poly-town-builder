@@ -13,6 +13,38 @@
       <div>評判: <span id="reputation-score">0</span></div>
       <div>人口: <span id="population-count">0</span>人</div>
       <div>平均満足度: <span id="average-satisfaction">-</span>%</div>
+      <div>町ランク: <span id="town-rank-label">村</span></div>
+    </div>
+    <button
+      type="button"
+      id="progression-panel-toggle"
+      class="progression-panel-toggle"
+      title="町ランク・目標・実績を表示"
+    >
+      📋 目標・実績
+    </button>
+    <div id="progression-modal" class="progression-modal hidden">
+      <div class="progression-modal-card">
+        <div class="progression-modal-header">
+          <h2>進行状況</h2>
+          <button type="button" id="progression-modal-close">×</button>
+        </div>
+        <div class="progression-modal-section">
+          <h3 id="progression-rank-label">村（町ランク）</h3>
+        </div>
+        <div class="progression-modal-section">
+          <h3>短期目標</h3>
+          <ul id="progression-quests-short" class="progression-list"></ul>
+        </div>
+        <div class="progression-modal-section">
+          <h3>中期目標</h3>
+          <ul id="progression-quests-mid" class="progression-list"></ul>
+        </div>
+        <div class="progression-modal-section">
+          <h3>実績</h3>
+          <ul id="progression-achievements" class="progression-list"></ul>
+        </div>
+      </div>
     </div>
     <div id="onboarding-overlay" class="onboarding-overlay hidden">
       <div class="onboarding-card">

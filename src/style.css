@@ -573,3 +573,92 @@ canvas {
 .range-select-confirm button:hover {
   background: #ffffff;
 }
+
+/* フェーズ24：進行状況（町ランク・クエスト・実績）モーダル */
+/* resource-panel(top:8px)・range-select-toggle(top:54px)の下に並べる */
+.progression-panel-toggle {
+  position: fixed;
+  top: 96px;
+  right: 8px;
+  z-index: 10;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.progression-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.progression-modal.hidden {
+  display: none;
+}
+
+.progression-modal-card {
+  width: 360px;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 20px 24px;
+  background: rgba(30, 40, 30, 0.97);
+  color: #fff;
+  font-family: system-ui, sans-serif;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.progression-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.progression-modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.progression-modal-header button {
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.progression-modal-section {
+  margin-top: 16px;
+}
+
+.progression-modal-section h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: #cfe8c4;
+}
+
+.progression-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progression-item {
+  font-size: 13px;
+}
+
+.progression-item.locked {
+  opacity: 0.5;
+}

@@ -66,7 +66,12 @@ import {
 } from './game/populace.js';
 import { showStatusMessage } from './game/statusMessage.js';
 import { updateResourcePanel } from './game/resourcePanel.js';
-import { updateProgression, recordLandmarkDiscovered, getCurrentLockedTypes } from './game/progression.js';
+import {
+  updateProgression,
+  recordLandmarkDiscovered,
+  getCurrentLockedTypes,
+  initProgressionPanel,
+} from './game/progression.js';
 import { initOnboarding } from './game/onboarding.js';
 import { initTouchControls } from './game/touchControls.js';
 
@@ -223,6 +228,7 @@ initDebugPanel({
 });
 
 initOnboarding();
+initProgressionPanel();
 
 // ブラウザの自動再生ポリシーのため、最初のキー入力/クリックで環境音を開始する
 function beginAudioOnFirstInteraction() {
