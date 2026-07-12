@@ -9,6 +9,7 @@ import {
   offsetPosition,
   rotatedEuler,
 } from './primitives.js';
+import { TILE_SIZE } from './terrain.js';
 import {
   BUILDING_ROOF_COLORS,
   SHOP_WALL_COLORS,
@@ -26,6 +27,13 @@ import {
   LOGGING_HUT_WALL_COLOR,
   LOGGING_HUT_ROOF_COLOR,
   LOG_PILE_COLOR,
+  TOWN_HALL_WALL_COLOR,
+  TOWN_HALL_ROOF_COLOR,
+  TOWN_HALL_FLAG_COLOR,
+  PLAZA_PAVING_COLOR,
+  PLAZA_CURB_COLOR,
+  PLAZA_PLANTER_COLOR,
+  FOUNTAIN_STONE_COLOR,
 } from './palette.js';
 
 const FLOOR_HEIGHT = 0.7;
@@ -295,6 +303,180 @@ export function generateLoggingHut(seed, tilePosition, { animate = true, rotatio
       ),
     );
   });
+
+  return { kind: 'instances', parts };
+}
+
+/**
+ * 役場：2階建ての落ち着いた色の建物＋三角屋根＋小さな尖塔と旗。
+ * フェーズ26：公共施設（維持費のかかる建物として管理する）。
+ */
+export function generateTownHall(seed, tilePosition, { animate = true, rotationY = 0 } = {}) {
+  const rng = mulberry32(seed);
+  const parts = [];
+  const width = 1.6;
+  const wallColor = new THREE.Color(TOWN_HALL_WALL_COLOR);
+  let currentY = 0;
+
+  for (let i = 0; i < 2; i += 1) {
+    const floorWidth = width - i * 0.15;
+    parts.push(
+      addInstance(
+        UNIT_BOX_POOL,
+        offsetPosition(tilePosition, 0, currentY, 0, rotationY),
+        rotatedEuler(rotationY),
+        new THREE.Vector3(floorWidth, FLOOR_HEIGHT, floorWidth),
+        wallColor,
+        { animate },
+      ),
+    );
+    currentY += FLOOR_HEIGHT;
+  }
+
+  const roofColor = new THREE.Color(TOWN_HALL_ROOF_COLOR);
+  parts.push(
+    addInstance(
+      UNIT_CONE_SQUARE_POOL,
+      offsetPosition(tilePosition, 0, currentY, 0, rotationY),
+      rotatedEuler(rotationY, 0, Math.PI / 4, 0),
+      new THREE.Vector3(width * 0.85, 0.55, width * 0.85),
+      roofColor,
+      { animate },
+    ),
+  );
+  currentY += 0.55;
+
+  // 尖塔と旗（個体差として、旗の高さを少しだけばらつかせる）。
+  const spireHeight = 0.4 + rng() * 0.2;
+  parts.push(
+    addInstance(
+      UNIT_CYLINDER_POOL,
+      offsetPosition(tilePosition, 0, currentY, 0, rotationY),
+      rotatedEuler(rotationY),
+      new THREE.Vector3(0.1, spireHeight, 0.1),
+      roofColor,
+      { animate },
+    ),
+  );
+  currentY += spireHeight;
+
+  const flagColor = new THREE.Color(TOWN_HALL_FLAG_COLOR);
+  parts.push(
+    addInstance(
+      UNIT_BOX_POOL,
+      offsetPosition(tilePosition, 0.16, currentY - 0.18, 0, rotationY),
+      rotatedEuler(rotationY),
+      new THREE.Vector3(0.32, 0.2, 0.02),
+      flagColor,
+      { animate },
+    ),
+  );
+
+  return { kind: 'instances', parts };
+}
+
+/**
+ * 広場：舗装された地面＋縁石＋四隅の植木鉢。町の憩いの場となる公共施設。
+ * フェーズ26：維持費のかかる建物として管理する。
+ */
+export function generatePlaza(seed, tilePosition, { animate = true, rotationY = 0 } = {}) {
+  const parts = [];
+  const pavingColor = new THREE.Color(PLAZA_PAVING_COLOR);
+  parts.push(
+    addInstance(
+      UNIT_BOX_POOL,
+      offsetPosition(tilePosition, 0, 0, 0, rotationY),
+      rotatedEuler(rotationY),
+      new THREE.Vector3(TILE_SIZE * 0.95, 0.06, TILE_SIZE * 0.95),
+      pavingColor,
+      { animate },
+    ),
+  );
+
+  const curbColor = new THREE.Color(PLAZA_CURB_COLOR);
+  const half = TILE_SIZE * 0.48;
+  [
+    { ox: 0, oz: half, w: TILE_SIZE, d: 0.08 },
+    { ox: 0, oz: -half, w: TILE_SIZE, d: 0.08 },
+    { ox: half, oz: 0, w: 0.08, d: TILE_SIZE },
+    { ox: -half, oz: 0, w: 0.08, d: TILE_SIZE },
+  ].forEach(({ ox, oz, w, d }) => {
+    parts.push(
+      addInstance(
+        UNIT_BOX_POOL,
+        offsetPosition(tilePosition, ox, 0.06, oz, rotationY),
+        rotatedEuler(rotationY),
+        new THREE.Vector3(w, 0.1, d),
+        curbColor,
+        { animate },
+      ),
+    );
+  });
+
+  const planterColor = new THREE.Color(PLAZA_PLANTER_COLOR);
+  [
+    [-1, -1],
+    [-1, 1],
+    [1, -1],
+    [1, 1],
+  ].forEach(([sx, sz]) => {
+    parts.push(
+      addInstance(
+        UNIT_SPHERE_POOL,
+        offsetPosition(tilePosition, sx * TILE_SIZE * 0.4, 0.1, sz * TILE_SIZE * 0.4, rotationY),
+        rotatedEuler(rotationY),
+        new THREE.Vector3(0.2, 0.2, 0.2),
+        planterColor,
+        { animate },
+      ),
+    );
+  });
+
+  return { kind: 'instances', parts };
+}
+
+/**
+ * 噴水の石組み部分（土台＋噴出口）。水面は別途world.jsがgenerateWaterで
+ * 重ねて合成する（フェーズ22の橋と同じ「composite」パターン）。
+ * フェーズ26：維持費のかかる建物として管理する。
+ */
+export function generateFountainStructure(seed, tilePosition, { animate = true, rotationY = 0 } = {}) {
+  const rng = mulberry32(seed);
+  const parts = [];
+
+  const basinColor = new THREE.Color(pick(rng, WELL_STONE_COLORS));
+  parts.push(
+    addInstance(
+      UNIT_CYLINDER_POOL,
+      offsetPosition(tilePosition, 0, 0, 0, rotationY),
+      rotatedEuler(rotationY),
+      new THREE.Vector3(0.75, 0.22, 0.75),
+      basinColor,
+      { animate },
+    ),
+  );
+
+  const spoutColor = new THREE.Color(FOUNTAIN_STONE_COLOR);
+  parts.push(
+    addInstance(
+      UNIT_CYLINDER_POOL,
+      offsetPosition(tilePosition, 0, 0.22, 0, rotationY),
+      rotatedEuler(rotationY),
+      new THREE.Vector3(0.14, 0.45, 0.14),
+      spoutColor,
+      { animate },
+    ),
+  );
+  parts.push(
+    addInstance(
+      UNIT_SPHERE_POOL,
+      offsetPosition(tilePosition, 0, 0.67, 0, rotationY),
+      rotatedEuler(rotationY),
+      new THREE.Vector3(0.16, 0.16, 0.16),
+      spoutColor,
+      { animate },
+    ),
+  );
 
   return { kind: 'instances', parts };
 }

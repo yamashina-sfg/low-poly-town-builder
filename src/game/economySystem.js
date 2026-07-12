@@ -43,6 +43,10 @@ const MAINTENANCE_COSTS = {
   windmill: 3,
   farm: 2,
   loggingHut: 2,
+  // フェーズ26：公共施設。役場は町の規模に見合った高めの維持費とする。
+  townHall: 5,
+  plaza: 2,
+  fountain: 3,
 };
 const CONDITION_REPAIR_STEP = 12; // 維持費を払えたときに回復する量
 const CONDITION_DECAY_STEP = 15; // 維持費を払えなかったときに悪化する量

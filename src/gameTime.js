@@ -24,6 +24,13 @@ export function formatGameTime() {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
+// 提灯など「夜だけ灯る」季節オブジェクトの判定に使う（フェーズ26）。
+// 19時〜翌6時を夜とする（住民の就寝時間帯22時〜6時より少し広め：
+// 提灯は薄暮から灯ってほしいため）。
+export function isNightHours(hours) {
+  return hours >= 19 || hours < 6;
+}
+
 /**
  * 眠ったときに呼ぶ：時間を次の朝6時まで一気に進める。
  */

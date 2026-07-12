@@ -22,11 +22,12 @@ function makeGrid(cells) {
 }
 
 describe('ROAD_TYPES', () => {
-  test('道として扱う4種類（road/dirtRoad/cobblestone/bridge）を含む', () => {
+  test('道として扱う5種類（road/dirtRoad/cobblestone/bridge/gravelPath）を含む', () => {
     expect(ROAD_TYPES.has('road')).toBe(true);
     expect(ROAD_TYPES.has('dirtRoad')).toBe(true);
     expect(ROAD_TYPES.has('cobblestone')).toBe(true);
     expect(ROAD_TYPES.has('bridge')).toBe(true);
+    expect(ROAD_TYPES.has('gravelPath')).toBe(true); // フェーズ26
     expect(ROAD_TYPES.has('house')).toBe(false);
   });
 });
@@ -95,6 +96,31 @@ describe('findRoadPath', () => {
     const houseTile = getGlobalTile(0, 0);
     const shopTile = getGlobalTile(6, 5);
     expect(findRoadPath(getGlobalTile, houseTile, shopTile)).toBeNull();
+  });
+
+  test('フェーズ26：砂利道(gravelPath)を挟んでも道は通しで繋がる', () => {
+    const getGlobalTile = makeGrid([
+      { x: 0, y: 0, type: 'house' },
+      { x: 1, y: 0, type: 'road' },
+      { x: 2, y: 0, type: 'gravelPath' },
+      { x: 3, y: 0, type: 'shop' },
+    ]);
+    const houseTile = getGlobalTile(0, 0);
+    const shopTile = getGlobalTile(3, 0);
+    const path = findRoadPath(getGlobalTile, houseTile, shopTile);
+    expect(path).not.toBeNull();
+    expect(path.map((tile) => tile.userData.globalX)).toEqual([1, 2]);
+  });
+});
+
+describe('generateRoad（砂利道：フェーズ26の地形バリエーション）', () => {
+  test('接続方向にかかわらず、常に小石の粒（UNIT_BOX_POOL）を散らす', () => {
+    const tilePosition = new THREE.Vector3(0, 0, 0);
+    const noConnections = { N: false, S: false, E: false, W: false };
+    const { parts } = generateRoad(tilePosition, noConnections, { type: 'gravelPath' });
+    // 基礎の地面1枚 + 小石5個 = 6個、全てUNIT_BOX_POOL。
+    expect(parts.length).toBe(6);
+    expect(parts.every((part) => part.key === UNIT_BOX_POOL)).toBe(true);
   });
 });
 

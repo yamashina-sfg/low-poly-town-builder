@@ -296,6 +296,7 @@ canvas {
   gap: 6px;
   padding: 8px;
   width: 170px;
+  max-height: 70vh;
   background: rgba(30, 40, 30, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
@@ -333,6 +334,12 @@ canvas {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  /* フェーズ26：項目数が増えたため、パネル内だけスクロールできるようにする
+     （min-height:0はflexアイテムがoverflowで実際に縮んでスクロールできる
+     ようにするために必要）。 */
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .build-menu-panel.hidden {

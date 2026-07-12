@@ -62,3 +62,38 @@ export const LOG_PILE_COLOR = 0x9a6a3f;
 // 元の色とこの色を条件(condition)に応じて混ぜ合わせることで、
 // 完全に元の色味を失わずに「くすんで見える」演出にする。
 export const DECAY_TINT_COLOR = 0x3a352c;
+
+// フェーズ26：地形バリエーション（砂利道・花畑・芝生）
+export const GRAVEL_PATH_COLOR = 0x9a9184;
+export const GRAVEL_PEBBLE_COLOR = 0x7a7268;
+export const MEADOW_GROUND_COLOR = 0x7cb35c;
+export const MEADOW_FLOWER_COLORS = [0xe9c53f, 0xf2f2f2, 0xd9455f, 0x8a5fd9];
+export const LUSH_LAWN_COLOR = 0x5c9a4a;
+export const WILD_GRASS_GROUND_COLOR = 0x6f9a4f;
+export const WILD_GRASS_TUFT_COLOR = 0x4a7c3f;
+
+// フェーズ26：公共施設（役場・広場・噴水）
+export const TOWN_HALL_WALL_COLOR = 0xe0dcc9;
+export const TOWN_HALL_ROOF_COLOR = 0x7a4a3a;
+export const TOWN_HALL_FLAG_COLOR = 0xc94c4c;
+export const PLAZA_PAVING_COLOR = 0xb8ae9a;
+export const PLAZA_CURB_COLOR = 0x8a8478;
+export const PLAZA_PLANTER_COLOR = 0x4a7c3f;
+export const FOUNTAIN_STONE_COLOR = 0x9a9a8c;
+
+// フェーズ26：季節オブジェクト（季節の木・提灯・雪だるま）。季節/時間帯に
+// 応じてsetInstanceColorで塗り替えるため、単色ではなく状態ごとの色を
+// まとめたテーブルにしておく。
+export const SEASONAL_TREE_TRUNK_COLOR = 0x6b4a34;
+export const SEASONAL_TREE_FOLIAGE_COLORS = {
+  spring: 0xf0b8d0, // 桜色
+  summer: 0x5c9a4a, // 新緑
+  autumn: 0xd97a2e, // 紅葉
+  winter: 0xeef2f2, // 雪化粧
+};
+export const LANTERN_POST_COLOR = 0x4a3626;
+export const LANTERN_LIT_COLOR = 0xffc766;
+export const LANTERN_UNLIT_COLOR = 0xcfc2a0;
+export const SNOWMAN_WINTER_COLOR = 0xf5f7f7;
+export const SNOWMAN_MELTED_COLOR = 0x8a6a4a;
+export const SNOWMAN_ACCENT_COLOR = 0x3a3a3a;

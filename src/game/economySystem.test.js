@@ -205,4 +205,26 @@ describe('維持費・老朽化（フェーズ25: 払えない建物は劣化し
     // 1ティックでは老朽化しても大きく変化しすぎない（半分未満の減少に収まる）。
     expect(houseTile.userData.condition).toBeGreaterThan(DEFAULT_BUILDING_CONDITION / 2);
   });
+
+  test('フェーズ26：公共施設（役場・広場・噴水）も維持費を払えないと老朽化する', () => {
+    const coords = [
+      [5, 5],
+      [5, 6],
+      [5, 7],
+    ];
+    ['townHall', 'plaza', 'fountain'].forEach((type, i) => {
+      const [gx, gy] = coords[i];
+      const tile = getGlobalTile(gx, gy);
+      buildOnTile(tile, type);
+      expect(tile.userData.condition).toBe(DEFAULT_BUILDING_CONDITION);
+    });
+
+    setResources({ wood: 0, money: 0 });
+    updateEconomySystem(20);
+
+    coords.forEach(([gx, gy]) => {
+      const tile = getGlobalTile(gx, gy);
+      expect(tile.userData.condition).toBeLessThan(DEFAULT_BUILDING_CONDITION);
+    });
+  });
 });

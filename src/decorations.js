@@ -5,6 +5,7 @@ import {
   UNIT_BOX_POOL,
   UNIT_CYLINDER_POOL,
   UNIT_SPHERE_POOL,
+  UNIT_TRUNK_POOL,
   offsetPosition,
   rotatedEuler,
 } from './primitives.js';
@@ -17,6 +18,14 @@ import {
   SIGN_BOARD_COLOR,
   STATUE_COLOR,
   STATUE_BASE_COLOR,
+  SEASONAL_TREE_TRUNK_COLOR,
+  SEASONAL_TREE_FOLIAGE_COLORS,
+  LANTERN_POST_COLOR,
+  LANTERN_LIT_COLOR,
+  LANTERN_UNLIT_COLOR,
+  SNOWMAN_WINTER_COLOR,
+  SNOWMAN_MELTED_COLOR,
+  SNOWMAN_ACCENT_COLOR,
 } from './palette.js';
 
 function pick(rng, colors) {
@@ -252,4 +261,160 @@ export function generateStatue(seed, tilePosition, { animate = true, rotationY =
   );
 
   return { kind: 'instances', parts };
+}
+
+// ------------------------------------------------------------------
+// フェーズ26：季節オブジェクト。季節・時間帯に応じて見た目（色）が自動で
+// 切り替わる装飾。色そのものはここでまとめて計算し、生成時（初期の見た目）と
+// game/seasonalSystem.jsの定期的な塗り替え（時間経過での切り替え）の
+// 両方から同じロジックを使う。
+// ------------------------------------------------------------------
+
+/**
+ * 季節の木の葉の色を、現在の季節から求める（春=桜, 夏=新緑, 秋=紅葉, 冬=雪化粧）。
+ */
+export function getSeasonalTreeFoliageColor(season) {
+  return new THREE.Color(SEASONAL_TREE_FOLIAGE_COLORS[season] ?? SEASONAL_TREE_FOLIAGE_COLORS.summer);
+}
+
+/**
+ * 提灯の灯りの色を、夜かどうかから求める（夜=灯った暖色、昼=消えた紙色）。
+ */
+export function getLanternGlowColor(isNight) {
+  return new THREE.Color(isNight ? LANTERN_LIT_COLOR : LANTERN_UNLIT_COLOR);
+}
+
+/**
+ * 雪だるまの色を、現在の季節から求める（冬=白い雪、それ以外=溶けた土色）。
+ */
+export function getSnowmanBodyColor(season) {
+  return new THREE.Color(season === 'winter' ? SNOWMAN_WINTER_COLOR : SNOWMAN_MELTED_COLOR);
+}
+
+/**
+ * 季節の木：幹＋3つ葉の房。葉の色は季節ごとに自動で切り替わる
+ * （初期の見た目はseasonで指定した季節、以後はgame/seasonalSystem.jsが
+ * 時間経過に応じて塗り替える）。返り値のseasonalPartsが、塗り替え対象の
+ * パーツ（葉）を示す。
+ */
+export function generateSeasonalTree(
+  seed,
+  tilePosition,
+  { animate = true, rotationY = 0, season = 'summer' } = {},
+) {
+  const parts = [];
+  const seasonalParts = [];
+
+  const trunkColor = new THREE.Color(SEASONAL_TREE_TRUNK_COLOR);
+  parts.push(
+    addInstance(
+      UNIT_TRUNK_POOL,
+      offsetPosition(tilePosition, 0, 0, 0, rotationY),
+      rotatedEuler(rotationY),
+      new THREE.Vector3(0.22, 0.75, 0.22),
+      trunkColor,
+      { animate },
+    ),
+  );
+
+  const foliageColor = getSeasonalTreeFoliageColor(season);
+  [
+    { x: 0, y: 0.75, z: 0, s: 0.42 },
+    { x: 0.22, y: 0.95, z: 0.1, s: 0.3 },
+    { x: -0.18, y: 1.0, z: -0.15, s: 0.28 },
+  ].forEach((offset) => {
+    const part = addInstance(
+      UNIT_SPHERE_POOL,
+      offsetPosition(tilePosition, offset.x, offset.y, offset.z, rotationY),
+      rotatedEuler(rotationY),
+      new THREE.Vector3(offset.s, offset.s, offset.s),
+      foliageColor,
+      { animate },
+    );
+    parts.push(part);
+    seasonalParts.push(part);
+  });
+
+  return { kind: 'instances', parts, seasonalParts };
+}
+
+/**
+ * 提灯：木の柱＋灯り部分。灯りの色は夜かどうかで自動的に切り替わる。
+ */
+export function generateLantern(seed, tilePosition, { animate = true, rotationY = 0, isNight = false } = {}) {
+  const parts = [];
+  const seasonalParts = [];
+
+  const postColor = new THREE.Color(LANTERN_POST_COLOR);
+  parts.push(
+    addInstance(
+      UNIT_CYLINDER_POOL,
+      offsetPosition(tilePosition, 0, 0, 0, rotationY),
+      rotatedEuler(rotationY),
+      new THREE.Vector3(0.05, 1.1, 0.05),
+      postColor,
+      { animate },
+    ),
+  );
+
+  const glowColor = getLanternGlowColor(isNight);
+  const glowPart = addInstance(
+    UNIT_SPHERE_POOL,
+    offsetPosition(tilePosition, 0, 1.15, 0, rotationY),
+    rotatedEuler(rotationY),
+    new THREE.Vector3(0.22, 0.28, 0.22),
+    glowColor,
+    { animate },
+  );
+  parts.push(glowPart);
+  seasonalParts.push(glowPart);
+
+  return { kind: 'instances', parts, seasonalParts };
+}
+
+/**
+ * 雪だるま：3段に積んだ雪玉＋小枝の腕。冬は白い雪、それ以外の季節は
+ * 溶けた（土っぽい）色に自動で切り替わる。
+ */
+export function generateSnowman(
+  seed,
+  tilePosition,
+  { animate = true, rotationY = 0, season = 'winter' } = {},
+) {
+  const parts = [];
+  const seasonalParts = [];
+
+  const bodyColor = getSnowmanBodyColor(season);
+  [
+    { y: 0, s: 0.4 },
+    { y: 0.55, s: 0.3 },
+    { y: 0.95, s: 0.22 },
+  ].forEach(({ y, s }) => {
+    const part = addInstance(
+      UNIT_SPHERE_POOL,
+      offsetPosition(tilePosition, 0, y, 0, rotationY),
+      rotatedEuler(rotationY),
+      new THREE.Vector3(s, s, s),
+      bodyColor,
+      { animate },
+    );
+    parts.push(part);
+    seasonalParts.push(part);
+  });
+
+  const accentColor = new THREE.Color(SNOWMAN_ACCENT_COLOR);
+  [-1, 1].forEach((side) => {
+    parts.push(
+      addInstance(
+        UNIT_CYLINDER_POOL,
+        offsetPosition(tilePosition, 0.2 * side, 0.6, 0, rotationY),
+        rotatedEuler(rotationY, 0, 0, side * (Math.PI / 3)),
+        new THREE.Vector3(0.03, 0.35, 0.03),
+        accentColor,
+        { animate },
+      ),
+    );
+  });
+
+  return { kind: 'instances', parts, seasonalParts };
 }

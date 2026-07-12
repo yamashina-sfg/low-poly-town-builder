@@ -41,9 +41,12 @@ tabButtons.forEach((btn) => {
 export function showBuildMenu(screenX, screenY, onSelectCallback) {
   onSelect = onSelectCallback;
 
-  // メニューが画面外にはみ出さないようにクランプする
+  // メニューが画面外にはみ出さないようにクランプする。
+  // フェーズ26：項目数の増加に伴いbuild-menu-panelがスクロールするように
+  // なったため（CSSのmax-height:70vh）、高さの見積もりもそれに合わせて
+  // 少し大きめにしておく。
   const menuWidth = 170;
-  const menuHeight = 260;
+  const menuHeight = Math.min(window.innerHeight * 0.7, 420);
   const clampedX = Math.min(screenX, window.innerWidth - menuWidth - 8);
   const clampedY = Math.min(screenY, window.innerHeight - menuHeight - 8);
 

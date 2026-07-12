@@ -19,6 +19,9 @@ import {
   generateRuins,
   generateFarm,
   generateLoggingHut,
+  generateTownHall,
+  generatePlaza,
+  generateFountainStructure,
 } from '../buildingVariants.js';
 import { generateBed, generateTable, generateChair, generateFireplace } from '../furniture.js';
 import {
@@ -28,16 +31,25 @@ import {
   generateFlowerbed,
   generateSignpost,
   generateStatue,
+  generateSeasonalTree,
+  generateLantern,
+  generateSnowman,
 } from '../decorations.js';
+import { generateFlowerMeadow, generateLushLawn, generateWildGrass } from '../terrainVariants.js';
 import { generateRoad, computeRoadConnections, ROAD_TYPES, getBridgeSurfaceHeight } from '../road.js';
 import { generateWater } from '../water.js';
 import { removeInstance } from '../instancing.js';
-import { getWood, getMoney, setResources } from '../economy.js';
+import { getWood, getMoney, getFood, setResources } from '../economy.js';
 import { saveTownToLocalStorage, loadTownFromLocalStorage } from '../save.js';
 import { getIndoorTiles, getIndoorSpawnPosition, applyRoomVariantForSeed } from '../interior.js';
+import { getCurrentSeason } from '../season.js';
+import { getGameTime, isNightHours } from '../gameTime.js';
 
 // 内装バリエーション選択専用のsalt（他の用途のseedと衝突しないようにするため）。
 const ROOM_VARIANT_SALT = 1800000;
+// フェーズ26：噴水の水面（buildingVariants.generateFountainStructureの
+// 石組みの水盤の高さに合わせる）。
+const FOUNTAIN_WATER_Y = 0.23;
 
 // 建物・家具・装飾のプロシージャル生成関数レジストリ。
 // 種類ごとに専用のseedソルトを与え、同じタイルに異なる種類を
@@ -63,6 +75,33 @@ const PROCEDURAL_GENERATORS = {
   flowerbed: { generate: generateFlowerbed, salt: 1600000 },
   signpost: { generate: generateSignpost, salt: 1700000 },
   statue: { generate: generateStatue, salt: 1800000 },
+  // フェーズ26：地形バリエーション（花畑・芝生2種）。自由に上書きできる
+  // 地形として扱う（BUILDING_TYPES/DECORATION_TYPESのどちらにも含めない）。
+  flowerMeadow: { generate: generateFlowerMeadow, salt: 2400000 },
+  lushLawn: { generate: generateLushLawn, salt: 2500000 },
+  wildGrass: { generate: generateWildGrass, salt: 2600000 },
+  // フェーズ26：公共施設（維持費のかかる建物として管理する）。
+  townHall: { generate: generateTownHall, salt: 2700000 },
+  plaza: { generate: generatePlaza, salt: 2800000 },
+  // 噴水の石組み部分のみ。水面はbuildOnTile側でgenerateWaterを重ねて
+  // compositeにする（フェーズ22の橋と同じパターン）。
+  fountain: { generate: generateFountainStructure, salt: 2900000 },
+  // フェーズ26：季節オブジェクト。季節・時間帯は、建てた瞬間の値を
+  // クロージャ経由で注入する（以後はgame/seasonalSystem.jsが定期的に
+  // 塗り替える）。
+  seasonalTree: {
+    generate: (seed, pos, opts) => generateSeasonalTree(seed, pos, { ...opts, season: getCurrentSeason() }),
+    salt: 3000000,
+  },
+  lantern: {
+    generate: (seed, pos, opts) =>
+      generateLantern(seed, pos, { ...opts, isNight: isNightHours(getGameTime().hours) }),
+    salt: 3100000,
+  },
+  snowman: {
+    generate: (seed, pos, opts) => generateSnowman(seed, pos, { ...opts, season: getCurrentSeason() }),
+    salt: 3200000,
+  },
 };
 
 export const BUILDING_TYPES = new Set([
@@ -73,9 +112,14 @@ export const BUILDING_TYPES = new Set([
   'windmill',
   'farm',
   'loggingHut',
+  // フェーズ26：公共施設。
+  'townHall',
+  'plaza',
+  'fountain',
 ]);
 // フェーズ25：維持費がかかる（払えないと老朽化する）建物の種類と、
 // 一定時間ごとに資材を生産する種類。どちらもBUILDING_TYPESの部分集合。
+// フェーズ26：役場・広場・噴水（公共施設）も維持費の対象に含める。
 export const MAINTAINED_BUILDING_TYPES = new Set([
   'house',
   'shop',
@@ -84,6 +128,9 @@ export const MAINTAINED_BUILDING_TYPES = new Set([
   'windmill',
   'farm',
   'loggingHut',
+  'townHall',
+  'plaza',
+  'fountain',
 ]);
 export const PRODUCTION_TYPES = new Set(['farm', 'loggingHut']);
 // 建物の状態(condition)・お店の在庫(shopInventory)の初期値であり、同時に
@@ -92,15 +139,26 @@ export const PRODUCTION_TYPES = new Set(['farm', 'loggingHut']);
 export const DEFAULT_BUILDING_CONDITION = 100;
 export const DEFAULT_SHOP_INVENTORY = 30;
 export const FURNITURE_TYPES = new Set(['bed', 'table', 'chair', 'fireplace']);
-export const DECORATION_TYPES = new Set(['fence', 'streetlamp', 'bench', 'flowerbed', 'signpost', 'statue']);
+export const DECORATION_TYPES = new Set([
+  'fence',
+  'streetlamp',
+  'bench',
+  'flowerbed',
+  'signpost',
+  'statue',
+  // フェーズ26：季節オブジェクト（季節・時間帯に応じて見た目が自動で切り替わる）。
+  'seasonalTree',
+  'lantern',
+  'snowman',
+]);
 // 建物・装飾（＝地形ではないもの）は、既に何か置かれているタイルには重ねて
 // 設置できない（フェーズ21：建築プレビューの重なりチェック）。木・道路・水・
 // 更地に戻すといった地形系の変更は、これまで通り上書きを許可する。
 const STRUCTURE_TYPES = new Set([...BUILDING_TYPES, ...DECORATION_TYPES]);
 // フェーズ22：橋は水の上にだけ架けられる。逆に、橋以外の道（土の道・石畳・
-// 通常の道）は水タイルには敷けない（水を渡すには橋を使う必要がある）。
+// 通常の道・砂利道）は水タイルには敷けない（水を渡すには橋を使う必要がある）。
 const WATER_ONLY_TYPES = new Set(['bridge']);
-const LAND_ROAD_TYPES = new Set(['road', 'dirtRoad', 'cobblestone']);
+const LAND_ROAD_TYPES = new Set(['road', 'dirtRoad', 'cobblestone', 'gravelPath']);
 
 /**
  * type種類のオブジェクトをtileに設置できるか（重なりチェック）。
@@ -346,7 +404,17 @@ export function buildOnTile(tile, type, { animate = true, rotationY = 0 } = {}) 
 
   if (generatorEntry) {
     const seed = computeSeed(globalX, globalY, generatorEntry.salt);
-    tile.userData.object = generatorEntry.generate(seed, tile.position, { animate, rotationY });
+    const result = generatorEntry.generate(seed, tile.position, { animate, rotationY });
+    if (type === 'fountain') {
+      // 噴水：石組み部分（result）に、小さな水面メッシュを重ねて
+      // compositeにする（フェーズ22の橋と同じパターン）。
+      const waterMesh = generateWater(tile.position, TILE_SIZE * 0.55, { animate });
+      waterMesh.position.y = FOUNTAIN_WATER_Y;
+      sceneRef.add(waterMesh);
+      tile.userData.object = { kind: 'composite', parts: result.parts, meshes: [waterMesh] };
+    } else {
+      tile.userData.object = result;
+    }
   } else if (type === 'water') {
     const object3D = generateWater(tile.position, TILE_SIZE, { animate });
     sceneRef.add(object3D);
@@ -687,7 +755,7 @@ export function saveWorld(getPopulaceSnapshot) {
   saveTownToLocalStorage(
     forEachLoadedTile,
     worldSeed,
-    { wood: getWood(), money: getMoney() },
+    { wood: getWood(), money: getMoney(), food: getFood() },
     getPopulaceSnapshot?.(),
   );
 }

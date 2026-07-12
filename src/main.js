@@ -67,6 +67,7 @@ import {
 import { showStatusMessage } from './game/statusMessage.js';
 import { updateResourcePanel } from './game/resourcePanel.js';
 import { updateEconomySystem } from './game/economySystem.js';
+import { updateSeasonalSystem } from './game/seasonalSystem.js';
 import {
   updateProgression,
   recordLandmarkDiscovered,
@@ -319,6 +320,7 @@ function animate() {
 
   updatePopulace(delta, clock.elapsedTime);
   updateEconomySystem(delta);
+  updateSeasonalSystem(delta);
 
   if (isIndoorMode()) {
     // 室内では部屋の範囲内にキャラを収める（チャンクの生成・可視化更新は行わない）

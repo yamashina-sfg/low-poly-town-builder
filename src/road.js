@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { addInstance, UNIT_BOX_POOL } from './instancing.js';
 import { UNIT_CYLINDER_POOL } from './primitives.js';
 import { TILE_SIZE } from './terrain.js';
-import { WOOD_COLOR } from './palette.js';
+import { WOOD_COLOR, GRAVEL_PATH_COLOR, GRAVEL_PEBBLE_COLOR } from './palette.js';
 
 const ZERO_ROTATION = new THREE.Euler(0, 0, 0);
 
@@ -14,14 +14,26 @@ const DIRECTIONS = [
 ];
 
 // 道として扱う（＝互いに接続し、NPCの経路探索が辿れる）タイル種別。
-// フェーズ22：土の道・石畳・橋を追加し、見た目違いでも接続・経路探索は共通にする。
-export const ROAD_TYPES = new Set(['road', 'dirtRoad', 'cobblestone', 'bridge']);
+// フェーズ22：土の道・石畳・橋を追加。フェーズ26：砂利道を追加。
+// 見た目が違っても接続・経路探索は共通にする。
+export const ROAD_TYPES = new Set(['road', 'dirtRoad', 'cobblestone', 'bridge', 'gravelPath']);
 
 const ROAD_PALETTES = {
   road: { base: new THREE.Color(0x777777), line: new THREE.Color(0xf2f2f2) },
   dirtRoad: { base: new THREE.Color(0x8a6a4a), line: null },
   cobblestone: { base: new THREE.Color(0xa8a196), line: new THREE.Color(0x8a8478) },
+  gravelPath: { base: new THREE.Color(GRAVEL_PATH_COLOR), line: null },
 };
+
+// 砂利道の小石の散らし方（固定オフセット。石畳の目地と同様、乱数無しで
+// 常に同じ見た目にする）。
+const GRAVEL_PEBBLE_OFFSETS = [
+  [-0.28, -0.22],
+  [0.18, -0.3],
+  [0.3, 0.15],
+  [-0.12, 0.28],
+  [0.05, -0.05],
+];
 
 /**
  * 上下左右の隣接タイルが道（ROAD_TYPESのいずれか）かどうかを判定する。
@@ -66,6 +78,25 @@ function generatePlainRoad(tilePosition, connections, { animate = false, type = 
           ZERO_ROTATION,
           new THREE.Vector3(TILE_SIZE, 0.03, 0.05),
           palette.line,
+          { animate },
+        ),
+      );
+    });
+    return { kind: 'instances', parts };
+  }
+
+  if (type === 'gravelPath') {
+    // 砂利道：接続方向に関係なく、常に小石を散らして砂利らしさを出す
+    // （土の道より粒立った質感にする）。
+    const pebbleColor = new THREE.Color(GRAVEL_PEBBLE_COLOR);
+    GRAVEL_PEBBLE_OFFSETS.forEach(([tx, tz]) => {
+      parts.push(
+        addInstance(
+          UNIT_BOX_POOL,
+          new THREE.Vector3(tilePosition.x + TILE_SIZE * tx, 0.04, tilePosition.z + TILE_SIZE * tz),
+          ZERO_ROTATION,
+          new THREE.Vector3(0.1, 0.03, 0.1),
+          pebbleColor,
           { animate },
         ),
       );

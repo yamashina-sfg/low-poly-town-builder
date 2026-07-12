@@ -33,6 +33,19 @@ const PREVIEW_FOOTPRINTS = {
   bridge: { width: TILE_SIZE, height: 0.3, depth: TILE_SIZE },
   water: { width: TILE_SIZE, height: 0.05, depth: TILE_SIZE },
   clear: { width: TILE_SIZE, height: 0.05, depth: TILE_SIZE },
+  // フェーズ26：地形バリエーション
+  gravelPath: { width: TILE_SIZE, height: 0.05, depth: TILE_SIZE },
+  flowerMeadow: { width: TILE_SIZE, height: 0.15, depth: TILE_SIZE },
+  lushLawn: { width: TILE_SIZE, height: 0.05, depth: TILE_SIZE },
+  wildGrass: { width: TILE_SIZE, height: 0.25, depth: TILE_SIZE },
+  // フェーズ26：公共施設
+  townHall: { width: 1.8, height: 2.4, depth: 1.6 },
+  plaza: { width: TILE_SIZE * 0.95, height: 0.3, depth: TILE_SIZE * 0.95 },
+  fountain: { width: 1.0, height: 1.0, depth: 1.0 },
+  // フェーズ26：季節オブジェクト
+  seasonalTree: { width: 0.9, height: 1.2, depth: 0.9 },
+  lantern: { width: 0.3, height: 1.4, depth: 0.3 },
+  snowman: { width: 0.6, height: 1.1, depth: 0.6 },
 };
 const DEFAULT_FOOTPRINT = { width: 1.0, height: 1.0, depth: 1.0 };
 

@@ -33,6 +33,19 @@ export const BUILD_COSTS = {
   dirtRoad: { wood: 1, money: 0 },
   cobblestone: { wood: 2, money: 5 },
   bridge: { wood: 10, money: 20 },
+  // フェーズ26：地形バリエーション（砂利道・花畑・芝生2種）。
+  gravelPath: { wood: 1, money: 3 },
+  flowerMeadow: { wood: 0, money: 8 },
+  lushLawn: { wood: 0, money: 3 },
+  wildGrass: { wood: 0, money: 2 },
+  // フェーズ26：公共施設。町の規模を象徴する分、費用も相応にかける。
+  townHall: { wood: 60, money: 150 },
+  plaza: { wood: 20, money: 60 },
+  fountain: { wood: 15, money: 70 },
+  // フェーズ26：季節オブジェクト。
+  seasonalTree: { wood: 3, money: 10 },
+  lantern: { wood: 2, money: 12 },
+  snowman: { wood: 0, money: 5 },
 };
 
 export function getWood() {
