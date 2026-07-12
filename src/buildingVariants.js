@@ -361,18 +361,28 @@ export function generateTownHall(seed, tilePosition, { animate = true, rotationY
   currentY += spireHeight;
 
   const flagColor = new THREE.Color(TOWN_HALL_FLAG_COLOR);
-  parts.push(
-    addInstance(
-      UNIT_BOX_POOL,
-      offsetPosition(tilePosition, 0.16, currentY - 0.18, 0, rotationY),
-      rotatedEuler(rotationY),
-      new THREE.Vector3(0.32, 0.2, 0.02),
-      flagColor,
-      { animate },
-    ),
-  );
+  const flagPosition = offsetPosition(tilePosition, 0.16, currentY - 0.18, 0, rotationY);
+  const flagBaseRotation = rotatedEuler(rotationY);
+  const flagScale = new THREE.Vector3(0.32, 0.2, 0.02);
+  const flagPart = addInstance(UNIT_BOX_POOL, flagPosition, flagBaseRotation, flagScale, flagColor, {
+    animate,
+  });
+  parts.push(flagPart);
 
-  return { kind: 'instances', parts };
+  // フェーズ27：稼働中演出（旗のはためき）用に、パーツと基準の変形をまとめて渡す。
+  // buildOnTileの通常経路（generatorEntryの戻り値をそのままtile.userData.objectに
+  // 入れる分岐）を通るため、animatedPartsは追加フィールドとして自然に引き継がれる。
+  const animatedParts = [
+    {
+      part: flagPart,
+      type: 'flag',
+      basePosition: flagPosition,
+      baseRotation: flagBaseRotation,
+      baseScale: flagScale,
+    },
+  ];
+
+  return { kind: 'instances', parts, animatedParts };
 }
 
 /**

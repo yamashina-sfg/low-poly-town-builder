@@ -67,6 +67,7 @@ import {
 import { showStatusMessage } from './game/statusMessage.js';
 import { updateResourcePanel } from './game/resourcePanel.js';
 import { updateEconomySystem } from './game/economySystem.js';
+import { initBuildingIdleAnimation, updateBuildingIdleAnimation } from './game/buildingIdleAnimation.js';
 import { updateSeasonalSystem } from './game/seasonalSystem.js';
 import {
   updateProgression,
@@ -143,6 +144,7 @@ setLandmarkDiscoveredHandler(recordLandmarkDiscovered);
 initPlayer(scene, camera, { clothingColor: 0x3b6ea5, hatColor: 0xb5533c });
 initPopulace(scene);
 initTouchControls();
+initBuildingIdleAnimation(scene);
 
 const outdoorReturnPosition = new THREE.Vector3();
 let outdoorReturnFacing = 0;
@@ -321,6 +323,7 @@ function animate() {
   updatePopulace(delta, clock.elapsedTime);
   updateEconomySystem(delta);
   updateSeasonalSystem(delta);
+  updateBuildingIdleAnimation(delta, clock.elapsedTime);
 
   if (isIndoorMode()) {
     // 室内では部屋の範囲内にキャラを収める（チャンクの生成・可視化更新は行わない）

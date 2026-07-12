@@ -89,6 +89,97 @@ canvas {
   border-radius: 6px;
 }
 
+/* フェーズ27：資源パネルの各項目の上に「+15」等を浮かせるための基準位置 */
+.resource-panel > div {
+  position: relative;
+}
+
+/* フェーズ27：資材・お金が増減した際にふわっと浮き上がって消える数値 */
+.floating-number {
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  transform: translateX(-50%);
+  font-weight: bold;
+  font-size: 13px;
+  pointer-events: none;
+  white-space: nowrap;
+  animation: floating-number-rise 1s ease-out forwards;
+}
+
+.floating-number-positive {
+  color: #8fe08a;
+}
+
+.floating-number-negative {
+  color: #ff8a80;
+}
+
+@keyframes floating-number-rise {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -22px);
+  }
+}
+
+/* フェーズ27：評判・町ランクが上がったときの画面中央の祝福演出 */
+.celebration-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.celebration-overlay.hidden {
+  display: none;
+}
+
+.celebration-text {
+  padding: 20px 36px;
+  border-radius: 16px;
+  background: rgba(20, 20, 20, 0.55);
+  color: #fff;
+  font-family: system-ui, sans-serif;
+  font-size: 34px;
+  font-weight: bold;
+  text-align: center;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+}
+
+.celebration-overlay.celebration-animate .celebration-text {
+  animation: celebration-pop 2.4s ease-out forwards;
+}
+
+@keyframes celebration-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  15% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  25% {
+    transform: scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.05);
+  }
+}
+
 .minimap {
   position: fixed;
   bottom: 16px;

@@ -5,6 +5,9 @@ const DAY_SKY = new THREE.Color(0x8fd3f4);
 const NIGHT_SUN = new THREE.Color(0x8ea3c9);
 const DAY_SUN = new THREE.Color(0xfff2e8);
 const DAWN_DUSK_SUN = new THREE.Color(0xff9d52); // 朝焼け・夕焼けのオレンジ
+// フェーズ27：朝焼け・夕焼けをよりドラマチックにするための、彩度の高い
+// マゼンタ寄りの差し色（warmthが最大に近いピーク付近だけ薄く混ぜる）。
+const DAWN_DUSK_ACCENT = new THREE.Color(0xff5c7a);
 const NIGHT_HEMI_SKY = new THREE.Color(0x27314a);
 const DAY_HEMI_SKY = new THREE.Color(0xbfe3ff);
 const NIGHT_HEMI_GROUND = new THREE.Color(0x1c2a1c);
@@ -39,12 +42,23 @@ export function updateDayNightCycle({ dayFraction, scene, dirLight, hemiLight, t
   if (targetPosition) {
     dirLight.target.position.copy(targetPosition);
   }
-  dirLight.color.copy(tmpColor.copy(NIGHT_SUN).lerp(DAY_SUN, dayFactor)).lerp(DAWN_DUSK_SUN, warmth * 0.7);
-  dirLight.intensity = THREE.MathUtils.lerp(0.15, 1.2, dayFactor);
+  // フェーズ27：朝焼け・夕焼けをよりドラマチックに見せるため、warmthの混合を
+  // 強め、ピーク付近（warmth > 0.5）ではさらに彩度の高い差し色も薄く重ねる。
+  // 夜⇔昼の基本的な明るさ・色温度の遷移（dayFactor基準）自体は変えないため、
+  // フェーズ23のNPC就寝判定（gameTime.jsの時刻・populace.jsのSLEEP_START_HOUR/
+  // WAKE_HOUR）には一切影響しない——あくまで見た目の演出強化にとどめる。
+  dirLight.color.copy(tmpColor.copy(NIGHT_SUN).lerp(DAY_SUN, dayFactor)).lerp(DAWN_DUSK_SUN, warmth * 0.85);
+  if (warmth > 0.5) {
+    dirLight.color.lerp(DAWN_DUSK_ACCENT, (warmth - 0.5) * 0.6);
+  }
+  dirLight.intensity = THREE.MathUtils.lerp(0.15, 1.2, dayFactor) + warmth * 0.25;
 
   hemiLight.color.copy(tmpColor.copy(NIGHT_HEMI_SKY).lerp(DAY_HEMI_SKY, dayFactor));
   hemiLight.groundColor.copy(tmpColor.copy(NIGHT_HEMI_GROUND).lerp(DAY_HEMI_GROUND, dayFactor));
   hemiLight.intensity = THREE.MathUtils.lerp(0.25, 1.1, dayFactor);
 
-  scene.background.copy(tmpColor.copy(NIGHT_SKY).lerp(DAY_SKY, dayFactor)).lerp(DAWN_DUSK_SUN, warmth * 0.25);
+  scene.background.copy(tmpColor.copy(NIGHT_SKY).lerp(DAY_SKY, dayFactor)).lerp(DAWN_DUSK_SUN, warmth * 0.45);
+  if (warmth > 0.5) {
+    scene.background.lerp(DAWN_DUSK_ACCENT, (warmth - 0.5) * 0.35);
+  }
 }

@@ -12,6 +12,8 @@ import {
   getShopInventory,
 } from './economySystem.js';
 import { showStatusMessage } from './statusMessage.js';
+import { spawnFloatingNumber } from './floatingNumbers.js';
+import { playChopSound, playTradeSound, playDeniedSound } from '../ambientAudio.js';
 
 // タイル間隔(TILE_SIZE=2)より広く取り、隣のタイルに置いたものにも反応するようにする
 export const INTERACTION_RANGE = 2.5;
@@ -42,12 +44,17 @@ export function initInteractions({ scene, getCharacterPosition: getPositionFn })
     if (!openShopTile) return;
     if (!isBuildingFunctional(openShopTile)) {
       showStatusMessage('このお店は維持費未払いで修繕中…営業していない');
+      playDeniedSound();
     } else if (trySpendWood(SHOP_TRADE_AMOUNT)) {
       addMoney(15);
       sellToShop(openShopTile, SHOP_TRADE_AMOUNT);
+      playTradeSound();
+      spawnFloatingNumber('wood', -SHOP_TRADE_AMOUNT);
+      spawnFloatingNumber('money', 15);
       showStatusMessage('木材10を売って15円手に入れた');
     } else {
       showStatusMessage('木材が足りない');
+      playDeniedSound();
     }
     openShop(openShopTile);
   });
@@ -55,14 +62,20 @@ export function initInteractions({ scene, getCharacterPosition: getPositionFn })
     if (!openShopTile) return;
     if (!isBuildingFunctional(openShopTile)) {
       showStatusMessage('このお店は維持費未払いで修繕中…営業していない');
+      playDeniedSound();
     } else if (!canBuyFromShop(openShopTile, SHOP_TRADE_AMOUNT)) {
       showStatusMessage('在庫が足りない…また今度来てください');
+      playDeniedSound();
     } else if (trySpendMoney(20)) {
       addWood(SHOP_TRADE_AMOUNT);
       buyFromShop(openShopTile, SHOP_TRADE_AMOUNT);
+      playTradeSound();
+      spawnFloatingNumber('money', -20);
+      spawnFloatingNumber('wood', SHOP_TRADE_AMOUNT);
       showStatusMessage('木材10を買った');
     } else {
       showStatusMessage('お金が足りない');
+      playDeniedSound();
     }
     openShop(openShopTile);
   });
@@ -110,6 +123,8 @@ function chopTree(tile) {
   const isSpecial = tile.userData.tileType === 'specialTree';
   const amount = isSpecial ? 15 + Math.floor(Math.random() * 11) : 3 + Math.floor(Math.random() * 4);
   addWood(amount);
+  playChopSound();
+  spawnFloatingNumber('wood', amount);
   const leafPosition = tile.position.clone().add(new THREE.Vector3(0, 0.9, 0));
   spawnParticleBurst(sceneRef, {
     position: leafPosition,

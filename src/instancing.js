@@ -162,6 +162,23 @@ export function setInstanceColor({ key, index }, color) {
 }
 
 /**
+ * 位置・回転・スケールをまとめて更新する（フェーズ27：役場の旗のはためきなど、
+ * 設置後も毎フレーム動かし続ける「稼働中の建物」演出のために追加）。
+ * ポップイン中のインスタンス（growAnimationsに乗っている間）には使わない想定
+ * （animate:trueで設置した直後に呼ぶと、ポップインアニメーションと
+ * 行列の書き込みが競合するため）。
+ */
+export function setInstanceTransform({ key, index }, position, rotation, scale) {
+  const pool = pools.get(key);
+  dummy.position.copy(position);
+  dummy.rotation.copy(rotation);
+  dummy.scale.copy(scale);
+  dummy.updateMatrix();
+  pool.mesh.setMatrixAt(index, dummy.matrix);
+  pool.mesh.instanceMatrix.needsUpdate = true;
+}
+
+/**
  * 建築ポップアップアニメーションを毎フレーム進行させる。
  */
 export function updateInstanceAnimations(elapsed) {

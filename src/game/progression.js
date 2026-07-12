@@ -8,6 +8,8 @@ import { getTownStats } from './world.js';
 import { getNpcCount, getDogCount } from './populace.js';
 import { getTotalWoodCollected, addWood, addMoney } from '../economy.js';
 import { showStatusMessage } from './statusMessage.js';
+import { triggerCelebration } from './celebrationEffect.js';
+import { playCelebrationSound } from '../ambientAudio.js';
 
 // ------------------------------------------------------------------
 // 純粋関数（テストしやすいよう、DOM/他モジュールの状態に依存しない形で分離）
@@ -293,6 +295,8 @@ export function updateProgression() {
 
   if (rankIndex(latestRank) > rankIndex(previousRank)) {
     showStatusMessage(`町ランクが「${rankEntry.label}」に昇格しました！🏙️`);
+    triggerCelebration(`🎉 町ランク「${rankEntry.label}」に昇格！ 🎉`);
+    playCelebrationSound();
   }
 
   const fullState = { ...state, reputationScore: score };

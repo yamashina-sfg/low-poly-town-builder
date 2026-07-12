@@ -4,6 +4,7 @@
 
 let audioContext = null;
 let masterGain = null;
+let sfxCompressor = null;
 let birdTimeoutId = null;
 let started = false;
 
@@ -59,7 +60,12 @@ export function startAmbientAudio() {
 
   masterGain = audioContext.createGain();
   masterGain.gain.value = 0.5;
-  masterGain.connect(audioContext.destination);
+
+  // フェーズ27：建築/伐採/取引などの効果音が環境音・足音と重なっても
+  // 音割れしないよう、マスター段の後にコンプレッサーを挟む。
+  sfxCompressor = audioContext.createDynamicsCompressor();
+  masterGain.connect(sfxCompressor);
+  sfxCompressor.connect(audioContext.destination);
 
   const noiseSource = audioContext.createBufferSource();
   noiseSource.buffer = createNoiseBuffer(audioContext);
@@ -104,6 +110,111 @@ export function playFootstep() {
   gain.connect(masterGain);
   noise.start(now);
   noise.stop(now + 0.1);
+}
+
+/**
+ * 単発のオシレーター音（アタック→指数減衰）を鳴らす小さなヘルパー。
+ * 建築・撤去・伐採・取引などの効果音はどれもこの形（周波数スイープ＋
+ * ゲインエンベロープ）のバリエーションなので共通化する。
+ */
+function playTone({ startFreq, endFreq, duration, peakGain, type = 'sine', delay = 0 }) {
+  const ctx = audioContext;
+  const now = ctx.currentTime + delay;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = type;
+  osc.frequency.setValueAtTime(startFreq, now);
+  if (endFreq !== startFreq) {
+    osc.frequency.exponentialRampToValueAtTime(endFreq, now + duration);
+  }
+
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(peakGain, now + Math.min(0.02, duration * 0.3));
+  gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+  osc.connect(gain);
+  gain.connect(masterGain);
+  osc.start(now);
+  osc.stop(now + duration + 0.02);
+}
+
+/**
+ * 建築確定時：明るく上昇する短いポップ音。
+ */
+export function playBuildSound() {
+  if (!started || !audioContext) return;
+  playTone({ startFreq: 520, endFreq: 880, duration: 0.14, peakGain: 0.12, type: 'triangle' });
+}
+
+/**
+ * 撤去時：低く下降する短い音（破壊的な操作であることを音でも示す）。
+ */
+export function playRemoveSound() {
+  if (!started || !audioContext) return;
+  playTone({ startFreq: 420, endFreq: 180, duration: 0.16, peakGain: 0.1, type: 'triangle' });
+}
+
+/**
+ * 伐採時：短く鋭いノイズバースト（斧を打ち込むような音）。
+ * 頻繁に鳴らされる操作なので、footstep同様ごく短くしてうるさくなり過ぎないようにする。
+ */
+export function playChopSound() {
+  if (!started || !audioContext) return;
+  const ctx = audioContext;
+  const now = ctx.currentTime;
+
+  const noise = ctx.createBufferSource();
+  noise.buffer = createNoiseBuffer(ctx, 0.08);
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = 900;
+  filter.Q.value = 0.8;
+
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.12, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+
+  noise.connect(filter);
+  filter.connect(gain);
+  gain.connect(masterGain);
+  noise.start(now);
+  noise.stop(now + 0.08);
+}
+
+/**
+ * お店での売買成立時：軽やかな2音の上昇チャイム（レジの「チャリン」のイメージ）。
+ */
+export function playTradeSound() {
+  if (!started || !audioContext) return;
+  playTone({ startFreq: 1046, endFreq: 1046, duration: 0.1, peakGain: 0.1, type: 'sine' });
+  playTone({ startFreq: 1318, endFreq: 1318, duration: 0.14, peakGain: 0.09, type: 'sine', delay: 0.07 });
+}
+
+/**
+ * 資金・在庫不足などで操作が通らなかったとき：控えめな低いブザー音。
+ */
+export function playDeniedSound() {
+  if (!started || !audioContext) return;
+  playTone({ startFreq: 180, endFreq: 140, duration: 0.15, peakGain: 0.06, type: 'sawtooth' });
+}
+
+/**
+ * 町ランク昇格時：画面中央の祝福演出に合わせた短い上昇アルペジオ。
+ */
+export function playCelebrationSound() {
+  if (!started || !audioContext) return;
+  [523, 659, 784, 1046].forEach((freq, i) => {
+    playTone({
+      startFreq: freq,
+      endFreq: freq,
+      duration: 0.2,
+      peakGain: 0.14,
+      type: 'triangle',
+      delay: i * 0.09,
+    });
+  });
 }
 
 export function setAmbientMuted(muted) {

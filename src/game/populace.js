@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { createNPC } from '../npc.js';
 import { createBird, createDog } from '../creatures.js';
 import { pushEntitiesApart } from '../collision.js';
@@ -84,6 +85,9 @@ function spawnNpc({
   npc.lowSatisfactionStreak = 0; // 満足度が低い状態が続いている秒数
   npc.clothingColor = clothingColor ?? NPC_CLOTHING_COLORS[colorIndex % NPC_CLOTHING_COLORS.length];
   npc.hatColor = hatColor ?? NPC_HAT_COLORS[colorIndex % NPC_HAT_COLORS.length];
+  // フェーズ27：満足度が高い/低いゾーンに入った瞬間だけ頭上へアイコンを出すための状態。
+  npc.moodZone = 'neutral'; // 'neutral' | 'happy' | 'sad'
+  npc.moodIcon = null;
 
   sceneRef.add(npc.group);
   npcs.push(npc);
@@ -340,6 +344,89 @@ function updateSatisfaction(npc) {
   }
 }
 
+// ------------------------------------------------------------------
+// フェーズ27：満足度に応じた頭上アイコン（ハート/困り顔）の一時表示。
+// 絵文字ではなく、既存の低ポリ図形（球・円錐）で表現し、他のビジュアルと
+// スタイルを揃える。canvasテクスチャを使わないため、jsdom環境のテストでも
+// 安全に呼び出せる。
+// ------------------------------------------------------------------
+const MOOD_ICON_LIFETIME = 2.2; // 秒（表示され続ける時間、フェードイン/アウト込み）
+const MOOD_ICON_HEIGHT = 2.5; // NPCグループ内のローカルY（頭のすぐ上）
+const HAPPY_ICON_COLOR = 0xe0607a; // ハート代わりのピンク球
+const SAD_ICON_COLOR = 0x5c6b7a; // 困り顔代わりの沈んだ色の雫型
+
+function createMoodIconMesh(kind) {
+  if (kind === 'happy') {
+    const geometry = new THREE.SphereGeometry(0.16, 6, 5);
+    const material = new THREE.MeshBasicMaterial({
+      color: HAPPY_ICON_COLOR,
+      transparent: true,
+      opacity: 0,
+    });
+    return new THREE.Mesh(geometry, material);
+  }
+  // 不満：先端を下に向けた小さな雫型（俯いた困り顔のイメージ）。
+  const geometry = new THREE.ConeGeometry(0.15, 0.26, 6);
+  geometry.rotateX(Math.PI);
+  const material = new THREE.MeshBasicMaterial({
+    color: SAD_ICON_COLOR,
+    transparent: true,
+    opacity: 0,
+  });
+  return new THREE.Mesh(geometry, material);
+}
+
+function disposeMoodIcon(npc) {
+  if (!npc.moodIcon) return;
+  npc.group.remove(npc.moodIcon.mesh);
+  npc.moodIcon.mesh.geometry.dispose();
+  npc.moodIcon.mesh.material.dispose();
+  npc.moodIcon = null;
+}
+
+function spawnMoodIcon(npc, kind) {
+  disposeMoodIcon(npc);
+  const mesh = createMoodIconMesh(kind);
+  mesh.position.set(0, MOOD_ICON_HEIGHT, 0);
+  npc.group.add(mesh);
+  npc.moodIcon = { mesh, elapsed: 0 };
+}
+
+/**
+ * 満足度が「非常に高い/低い」ゾーンへ新たに入った瞬間だけアイコンを出す
+ * （ゾーンに留まり続ける間は間引きタイマーが回るたびに何度も出したりしない）。
+ */
+function updateMoodZone(npc) {
+  const zone =
+    npc.satisfaction >= HIGH_SATISFACTION_THRESHOLD
+      ? 'happy'
+      : npc.satisfaction <= LOW_SATISFACTION_THRESHOLD
+        ? 'sad'
+        : 'neutral';
+  if (zone !== npc.moodZone && zone !== 'neutral') {
+    spawnMoodIcon(npc, zone);
+  }
+  npc.moodZone = zone;
+}
+
+/**
+ * 表示中のアイコンのフェードイン/アウトと、ふわふわ浮き上がる動きを進める。
+ * 毎フレーム呼ぶ想定（間引くとフェードがカクついて見える）。
+ */
+function updateMoodIconAnimation(npc, delta) {
+  if (!npc.moodIcon) return;
+  npc.moodIcon.elapsed += delta;
+  const t = npc.moodIcon.elapsed / MOOD_ICON_LIFETIME;
+  if (t >= 1) {
+    disposeMoodIcon(npc);
+    return;
+  }
+  const fadeIn = Math.min(1, t / 0.15);
+  const fadeOut = Math.min(1, (1 - t) / 0.3);
+  npc.moodIcon.mesh.material.opacity = Math.min(fadeIn, fadeOut);
+  npc.moodIcon.mesh.position.y = MOOD_ICON_HEIGHT + t * 0.3 + Math.sin(npc.moodIcon.elapsed * 3) * 0.04;
+}
+
 /**
  * 住居に割り当てられているNPC（＝実際の住民）の平均満足度。
  * 住民が1人もいない場合はnullを返す（新規住民の「呼び水」がいない状態）。
@@ -498,6 +585,7 @@ export function updatePopulace(delta, elapsedTime) {
       updateAssignment(npc);
       updateCommuteDecision(npc);
       updateSatisfaction(npc);
+      updateMoodZone(npc);
     });
     // 移住はnpcs配列そのものを変更するため、上のforEachが終わってから行う
     // （スナップショット配列に対して判定した上で、生きているnpcs配列を操作する）。
@@ -513,6 +601,7 @@ export function updatePopulace(delta, elapsedTime) {
   npcs.forEach((npc) => updateCommuteMovement(npc));
 
   npcs.forEach((npc) => npc.update(delta));
+  npcs.forEach((npc) => updateMoodIconAnimation(npc, delta));
   dogs.forEach((dog) => dog.update(delta));
   birds.forEach((bird) => bird.update(elapsedTime));
 

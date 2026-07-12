@@ -17,6 +17,8 @@ import {
 import { getCurrentLockedTypes } from './progression.js';
 import { showStatusMessage } from './statusMessage.js';
 import { updateResourcePanel } from './resourcePanel.js';
+import { spawnFloatingNumber } from './floatingNumbers.js';
+import { playBuildSound, playRemoveSound, playDeniedSound } from '../ambientAudio.js';
 import {
   initBuildPreview,
   startPreview,
@@ -196,6 +198,7 @@ function confirmPreviewPlacement() {
   const type = pendingBuildType;
   if (!isPlacementValid(tile, type)) {
     showStatusMessage(moveSourceTile ? 'ここには移動できません' : 'ここには置けません');
+    playDeniedSound();
     return;
   }
 
@@ -211,16 +214,22 @@ function confirmPreviewPlacement() {
   } else {
     if (getCurrentLockedTypes().includes(type)) {
       showStatusMessage('まだ解放されていません');
+      playDeniedSound();
       stopBuildPreview();
       return;
     }
     if (!canAfford(type)) {
       showStatusMessage('木材またはお金が足りない');
+      playDeniedSound();
       return;
     }
+    const cost = BUILD_COSTS[type];
     pay(type);
     updateResourcePanel();
     buildOnTile(tile, type, { rotationY });
+    playBuildSound();
+    if (cost?.wood) spawnFloatingNumber('wood', -cost.wood);
+    if (cost?.money) spawnFloatingNumber('money', -cost.money);
     showStatusMessage('設置しました');
   }
 
@@ -354,11 +363,16 @@ function handleClick(event) {
     showBuildMenu(event.clientX, event.clientY, (type) => {
       if (!canAfford(type)) {
         showStatusMessage('木材またはお金が足りない');
+        playDeniedSound();
         return;
       }
+      const cost = BUILD_COSTS[type];
       pay(type);
       updateResourcePanel();
       buildOnIndoorTile(tile, type);
+      playBuildSound();
+      if (cost?.wood) spawnFloatingNumber('wood', -cost.wood);
+      if (cost?.money) spawnFloatingNumber('money', -cost.money);
     });
     return;
   }
@@ -441,6 +455,7 @@ export function initBuildSystem({ scene, renderer, camera, onEnterHouse }) {
     const tile = contextMenuTile;
     closeContextMenu();
     removeTileContent(tile);
+    playRemoveSound();
     showStatusMessage('撤去しました');
   });
   contextCancelBtn.addEventListener('click', () => closeContextMenu());
@@ -449,6 +464,8 @@ export function initBuildSystem({ scene, renderer, camera, onEnterHouse }) {
   rangeSelectYesBtn.addEventListener('click', () => {
     const count = rangeSelectPendingTiles.length;
     rangeSelectPendingTiles.forEach((tile) => removeTileContent(tile));
+    // 複数タイルでも音は1回だけ鳴らす（タイル数だけ連打すると耳障りなため）。
+    if (count > 0) playRemoveSound();
     clearRangeSelectPending();
     showStatusMessage(`${count}個のタイルを撤去しました`);
   });
