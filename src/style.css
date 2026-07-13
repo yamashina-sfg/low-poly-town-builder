@@ -12,6 +12,12 @@ body {
   height: 100vh;
 }
 
+/* フェーズ28：タイトル画面・オープニング演出の間は、常時表示のゲームHUD
+   （資源・評判・ミニマップ・デバッグパネルなど）をまとめて隠す。 */
+#game-hud.hidden {
+  display: none;
+}
+
 canvas {
   display: block;
 }
@@ -545,6 +551,179 @@ canvas {
 }
 
 .onboarding-card button:hover {
+  background: #7fc06c;
+}
+
+/* フェーズ28：タイトル画面（背景は実際の3Dシーンをカメラ演出付きで表示する
+   ため、このオーバーレイ自体は半透明にしてタイトルロゴ・メニューだけを
+   前面に見せる）。 */
+.title-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 15, 10, 0.35);
+}
+
+.title-screen.hidden {
+  display: none;
+}
+
+.title-screen-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 32px 40px;
+  background: rgba(20, 30, 20, 0.55);
+  border-radius: 16px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+
+.title-logo {
+  margin: 0;
+  color: #fff;
+  font-family: system-ui, sans-serif;
+  font-size: 42px;
+  font-weight: bold;
+  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.6);
+}
+
+.title-tagline {
+  margin: 0 0 16px;
+  color: #e8f2e0;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.title-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 220px;
+}
+
+.title-menu button {
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: #6fae5c;
+  color: #fff;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.title-menu button:hover {
+  background: #7fc06c;
+}
+
+.title-menu button:disabled {
+  background: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.55);
+  cursor: not-allowed;
+}
+
+.title-settings-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 28px;
+  min-width: 260px;
+  background: rgba(30, 40, 30, 0.97);
+  color: #fff;
+  font-family: system-ui, sans-serif;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.title-settings-panel.hidden {
+  display: none;
+}
+
+.title-settings-panel h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.title-settings-panel .debug-seed input {
+  width: 100px;
+}
+
+.title-settings-panel button {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #223322;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.title-settings-panel button:hover {
+  background: #ffffff;
+}
+
+/* フェーズ28：「はじめから」を選んだ直後の、朝焼けの草原でのオープニング演出 */
+.opening-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 10vh;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0));
+}
+
+.opening-overlay.hidden {
+  display: none;
+}
+
+.opening-card {
+  max-width: 420px;
+  padding: 22px 28px;
+  background: rgba(20, 20, 20, 0.72);
+  color: #fff;
+  font-family: system-ui, sans-serif;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+
+.opening-text {
+  margin: 0 0 12px;
+  line-height: 1.8;
+  font-size: 15px;
+}
+
+.opening-goal {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: #cfe8c4;
+}
+
+.opening-card button {
+  padding: 10px 24px;
+  border: none;
+  border-radius: 8px;
+  background: #6fae5c;
+  color: #fff;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.opening-card button:hover {
   background: #7fc06c;
 }
 

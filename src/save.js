@@ -70,3 +70,11 @@ export function loadTownFromLocalStorage() {
     return null;
   }
 }
+
+/**
+ * セーブデータが存在するか（タイトル画面の「つづきから」ボタンを
+ * 有効化してよいかの判定に使う）。壊れたデータは読込不可＝無いものとして扱う。
+ */
+export function hasSaveData() {
+  return loadTownFromLocalStorage() !== null;
+}

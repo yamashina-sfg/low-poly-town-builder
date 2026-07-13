@@ -12,7 +12,7 @@ import {
   setMuteButtonLabel,
   updateTimeAndSleepiness,
 } from './debugPanel.js';
-import { advanceGameTime, getGameTime, formatGameTime } from './gameTime.js';
+import { advanceGameTime, getGameTime, formatGameTime, skipTimeToMorning } from './gameTime.js';
 import { advanceSleepiness, getSleepiness } from './playerStatus.js';
 import { updateDayNightCycle } from './dayNightCycle.js';
 import { startAmbientAudio, setAmbientMuted } from './ambientAudio.js';
@@ -40,6 +40,7 @@ import {
   exitIndoorSession,
   setLandmarkDiscoveredHandler,
   getGroundHeightAt,
+  hasSaveData,
 } from './game/world.js';
 import {
   initPlayer,
@@ -77,6 +78,8 @@ import {
 } from './game/progression.js';
 import { initOnboarding } from './game/onboarding.js';
 import { initTouchControls } from './game/touchControls.js';
+import { initTitleScreen } from './game/titleScreen.js';
+import { showOpeningSequence } from './game/opening.js';
 
 // ------------------------------------------------------------------
 // シーン基本セットアップ
@@ -231,7 +234,6 @@ initDebugPanel({
   onHatColorChange: setHatColor,
 });
 
-initOnboarding();
 initProgressionPanel();
 
 // ブラウザの自動再生ポリシーのため、最初のキー入力/クリックで環境音を開始する
@@ -242,6 +244,71 @@ function beginAudioOnFirstInteraction() {
 }
 window.addEventListener('keydown', beginAudioOnFirstInteraction, { once: true });
 window.addEventListener('click', beginAudioOnFirstInteraction, { once: true });
+
+// ------------------------------------------------------------------
+// フェーズ28：タイトル画面・オープニング演出
+// ------------------------------------------------------------------
+// タイトル画面・オープニング演出の間は「見てもらうだけ」の状態にする
+// （移動・建築などの入力やワールドのシミュレーションは一切進めない）。
+// gameStartedが実際の入力・シミュレーション進行のゲート、useTitleCameraは
+// カメラ演出（タイトル背景のゆっくりした周回）を使うかどうかの独立したフラグ
+// （オープニング演出中はuseTitleCamera=falseだがgameStarted=falseのまま、
+// 通常の三人称カメラでキャラの背後から朝焼けの草原を見せる）。
+let gameStarted = false;
+let useTitleCamera = true;
+const gameHudEl = document.getElementById('game-hud');
+
+const TITLE_CAMERA_RADIUS = 22;
+const TITLE_CAMERA_HEIGHT = 13;
+const TITLE_CAMERA_ANGULAR_SPEED = (Math.PI * 2) / 50; // 50秒で町の周りを1周する
+
+function updateTitleCamera(elapsedTime) {
+  const angle = elapsedTime * TITLE_CAMERA_ANGULAR_SPEED;
+  camera.position.set(
+    Math.cos(angle) * TITLE_CAMERA_RADIUS,
+    TITLE_CAMERA_HEIGHT,
+    Math.sin(angle) * TITLE_CAMERA_RADIUS,
+  );
+  camera.lookAt(0, 1, 0);
+}
+
+/**
+ * タイトル画面を閉じた直後、「はじめから」「つづきから」共通の見た目の準備
+ * （朝焼けの時刻・キャラ背後の通常カメラ）を行う。ゲーム内時刻はセーブ
+ * データに含まれないため、どちらの経路でも朝から始まる。
+ */
+function prepareOutdoorDawnView() {
+  skipTimeToMorning();
+  useTitleCamera = false;
+  snapCameraToCharacter(false);
+}
+
+/**
+ * 実際に入力・シミュレーションを開始し、常時表示のゲームHUDを見せる。
+ * オープニング演出後（はじめから）／読込直後（つづきから）の両方から呼ばれる。
+ */
+function revealGameplay() {
+  gameStarted = true;
+  gameHudEl?.classList.remove('hidden');
+  initOnboarding();
+}
+
+function handleNewGame() {
+  prepareOutdoorDawnView();
+  showOpeningSequence(revealGameplay);
+}
+
+function handleContinueGame() {
+  handleLoad();
+  prepareOutdoorDawnView();
+  revealGameplay();
+}
+
+initTitleScreen({
+  hasSaveData: hasSaveData(),
+  onNewGame: handleNewGame,
+  onContinue: handleContinueGame,
+});
 
 // ------------------------------------------------------------------
 // メインループ
@@ -262,16 +329,20 @@ function animate() {
   updateWaterTime(clock.elapsedTime);
   updateInstanceAnimations(clock.elapsedTime);
 
-  advanceGameTime(delta);
-  advanceSleepiness(delta);
+  // タイトル画面・オープニング演出の間はゲーム内時刻を進めない
+  // （dayFractionは起動時の朝のまま固定され、朝焼けの光がずっと保たれる）。
+  if (gameStarted) {
+    advanceGameTime(delta);
+    advanceSleepiness(delta);
+  }
   const { dayFraction } = getGameTime();
   updateDayNightCycle({ dayFraction, scene, dirLight, hemiLight, targetPosition: getCharacterPosition() });
-
-  updateInteractionTarget();
 
   fpsFrameCount += 1;
   fpsElapsed += delta;
   if (fpsElapsed >= 0.5) {
+    // FPSはタイトル画面のカメラ演出が重くなっていないかの確認にも使うため、
+    // gameStartedに関わらず常時計測する。
     const fps = Math.round(fpsFrameCount / fpsElapsed);
     const stats = getTownStats();
     updateDebugStats({
@@ -282,81 +353,91 @@ function animate() {
       fps,
       instanceCount: getInstanceCount(),
     });
-    updateTimeAndSleepiness(formatGameTime(), Math.round(getSleepiness()));
-    updateResourcePanel();
-    updateProgression();
-    updatePopulacePanel();
-    updateButtonStates({ lockedTypes: getCurrentLockedTypes(), wood: getWood(), money: getMoney() });
+    if (gameStarted) {
+      updateTimeAndSleepiness(formatGameTime(), Math.round(getSleepiness()));
+      updateResourcePanel();
+      updateProgression();
+      updatePopulacePanel();
+      updateButtonStates({ lockedTypes: getCurrentLockedTypes(), wood: getWood(), money: getMoney() });
+    }
     fpsFrameCount = 0;
     fpsElapsed = 0;
   }
 
-  const isMoving = updateMovementInput(delta);
+  if (gameStarted) {
+    updateInteractionTarget();
 
-  // 水タイルにときどききらめきパーティクルを出す
-  const waterTiles = getWaterTiles();
-  sparkleTimer += delta;
-  if (sparkleTimer >= 0.4 && waterTiles.size > 0) {
-    sparkleTimer = 0;
-    const index = Math.floor(Math.random() * waterTiles.size);
-    let i = 0;
-    for (const waterTile of waterTiles) {
-      if (i === index) {
-        spawnSparkle(scene, waterTile.position.clone().add(new THREE.Vector3(0, 0.1, 0)));
-        break;
+    const isMoving = updateMovementInput(delta);
+
+    // 水タイルにときどききらめきパーティクルを出す
+    const waterTiles = getWaterTiles();
+    sparkleTimer += delta;
+    if (sparkleTimer >= 0.4 && waterTiles.size > 0) {
+      sparkleTimer = 0;
+      const index = Math.floor(Math.random() * waterTiles.size);
+      let i = 0;
+      for (const waterTile of waterTiles) {
+        if (i === index) {
+          spawnSparkle(scene, waterTile.position.clone().add(new THREE.Vector3(0, 0.1, 0)));
+          break;
+        }
+        i += 1;
       }
-      i += 1;
+    }
+
+    // ミニマップは毎フレームではなく間引いて更新する
+    minimapTimer += delta;
+    if (minimapTimer >= 0.15) {
+      minimapTimer = 0;
+      updateMinimap({
+        characterPosition: getCharacterPosition(),
+        characterFacing: getCharacterFacing(),
+        forEachLoadedTile,
+      });
+    }
+
+    updatePopulace(delta, clock.elapsedTime);
+    updateEconomySystem(delta);
+    updateSeasonalSystem(delta);
+    updateBuildingIdleAnimation(delta, clock.elapsedTime);
+
+    if (isIndoorMode()) {
+      // 室内では部屋の範囲内にキャラを収める（チャンクの生成・可視化更新は行わない）
+      const characterPosition = getCharacterPosition();
+      const roomHalf = ROOM_SIZE / 2 - 0.4;
+      characterPosition.x = THREE.MathUtils.clamp(
+        characterPosition.x,
+        INTERIOR_OFFSET.x - roomHalf,
+        INTERIOR_OFFSET.x + roomHalf,
+      );
+      characterPosition.z = THREE.MathUtils.clamp(
+        characterPosition.z,
+        INTERIOR_OFFSET.z - roomHalf,
+        INTERIOR_OFFSET.z + roomHalf,
+      );
+      resolveIndoorCollision(characterPosition, PLAYER_COLLISION_RADIUS);
+    } else {
+      const characterPosition = getCharacterPosition();
+      resolveOutdoorCollision(characterPosition, PLAYER_COLLISION_RADIUS);
+      // 橋のアーチに沿って、実際に高さを登り降りしながら渡れるようにする
+      // （通常の地面・道の上では常に0が返るため、これまで通り平坦になる）。
+      characterPosition.y = getGroundHeightAt(characterPosition.x, characterPosition.z);
+
+      if (isMoving) {
+        // キャラが今いるチャンクが変わったときだけ、周囲3x3チャンクの生成漏れを
+        // 埋め、それより外側のチャンクは実際にアンロード（破棄）する
+        updateWorldStreaming(characterPosition.x, characterPosition.z);
+      }
+
+      resolvePopulaceInterCollisions(characterPosition, PLAYER_COLLISION_RADIUS);
     }
   }
 
-  // ミニマップは毎フレームではなく間引いて更新する
-  minimapTimer += delta;
-  if (minimapTimer >= 0.15) {
-    minimapTimer = 0;
-    updateMinimap({
-      characterPosition: getCharacterPosition(),
-      characterFacing: getCharacterFacing(),
-      forEachLoadedTile,
-    });
-  }
-
-  updatePopulace(delta, clock.elapsedTime);
-  updateEconomySystem(delta);
-  updateSeasonalSystem(delta);
-  updateBuildingIdleAnimation(delta, clock.elapsedTime);
-
-  if (isIndoorMode()) {
-    // 室内では部屋の範囲内にキャラを収める（チャンクの生成・可視化更新は行わない）
-    const characterPosition = getCharacterPosition();
-    const roomHalf = ROOM_SIZE / 2 - 0.4;
-    characterPosition.x = THREE.MathUtils.clamp(
-      characterPosition.x,
-      INTERIOR_OFFSET.x - roomHalf,
-      INTERIOR_OFFSET.x + roomHalf,
-    );
-    characterPosition.z = THREE.MathUtils.clamp(
-      characterPosition.z,
-      INTERIOR_OFFSET.z - roomHalf,
-      INTERIOR_OFFSET.z + roomHalf,
-    );
-    resolveIndoorCollision(characterPosition, PLAYER_COLLISION_RADIUS);
+  if (useTitleCamera) {
+    updateTitleCamera(clock.elapsedTime);
   } else {
-    const characterPosition = getCharacterPosition();
-    resolveOutdoorCollision(characterPosition, PLAYER_COLLISION_RADIUS);
-    // 橋のアーチに沿って、実際に高さを登り降りしながら渡れるようにする
-    // （通常の地面・道の上では常に0が返るため、これまで通り平坦になる）。
-    characterPosition.y = getGroundHeightAt(characterPosition.x, characterPosition.z);
-
-    if (isMoving) {
-      // キャラが今いるチャンクが変わったときだけ、周囲3x3チャンクの生成漏れを
-      // 埋め、それより外側のチャンクは実際にアンロード（破棄）する
-      updateWorldStreaming(characterPosition.x, characterPosition.z);
-    }
-
-    resolvePopulaceInterCollisions(characterPosition, PLAYER_COLLISION_RADIUS);
+    updateCameraFollow(isIndoorMode());
   }
-
-  updateCameraFollow(isIndoorMode());
 
   renderer.render(scene, camera);
   requestAnimationFrame(animate);

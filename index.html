@@ -8,21 +8,94 @@
   </head>
   <body>
     <div id="app"></div>
-    <div id="reputation-panel" class="reputation-panel">
-      <div id="reputation-title">静かな原っぱ</div>
-      <div>評判: <span id="reputation-score">0</span></div>
-      <div>人口: <span id="population-count">0</span>人</div>
-      <div>平均満足度: <span id="average-satisfaction">-</span>%</div>
-      <div>町ランク: <span id="town-rank-label">村</span></div>
+    <div id="game-hud" class="hidden">
+      <div id="reputation-panel" class="reputation-panel">
+        <div id="reputation-title">静かな原っぱ</div>
+        <div>評判: <span id="reputation-score">0</span></div>
+        <div>人口: <span id="population-count">0</span>人</div>
+        <div>平均満足度: <span id="average-satisfaction">-</span>%</div>
+        <div>町ランク: <span id="town-rank-label">村</span></div>
+      </div>
+      <button
+        type="button"
+        id="progression-panel-toggle"
+        class="progression-panel-toggle"
+        title="町ランク・目標・実績を表示"
+      >
+        📋 目標・実績
+      </button>
+      <div id="resource-panel" class="resource-panel">
+        <div>🪵 <span id="resource-wood">0</span></div>
+        <div>💰 <span id="resource-money">0</span></div>
+        <div>🌾 <span id="resource-food">0</span></div>
+      </div>
+      <canvas id="minimap-canvas" class="minimap" width="150" height="150"></canvas>
+      <div id="player-panel" class="debug-panel">
+        <div class="debug-stats">
+          <div>時刻: <span id="stat-time">06:00</span></div>
+          <div class="sleepiness-row">
+            眠気:
+            <span id="sleepiness-bar" class="sleepiness-bar"><span id="sleepiness-bar-fill"></span></span>
+          </div>
+        </div>
+        <div class="debug-buttons">
+          <button type="button" id="save-button">保存</button>
+          <button type="button" id="load-button">読込</button>
+          <button type="button" id="reset-button">リセット</button>
+          <button type="button" id="mute-button">🔊</button>
+        </div>
+      </div>
+      <button type="button" id="range-select-toggle" class="range-select-toggle" title="範囲選択して一括撤去">
+        範囲選択
+      </button>
     </div>
-    <button
-      type="button"
-      id="progression-panel-toggle"
-      class="progression-panel-toggle"
-      title="町ランク・目標・実績を表示"
-    >
-      📋 目標・実績
-    </button>
+    <div id="title-screen" class="title-screen">
+      <div class="title-screen-content">
+        <h1 class="title-logo">ローポリタウンビルダー</h1>
+        <p class="title-tagline">木を集め、家を建て、少しずつ町を育てよう</p>
+        <div class="title-menu">
+          <button type="button" id="title-new-game">はじめから</button>
+          <button type="button" id="title-continue" disabled>つづきから</button>
+          <button type="button" id="title-settings-open">設定</button>
+        </div>
+      </div>
+      <div id="title-settings-panel" class="title-settings-panel hidden">
+        <h2>設定</h2>
+        <label class="debug-seed">
+          シード
+          <input type="number" id="seed-input" value="1" />
+        </label>
+        <div class="debug-character">
+          <label>服の色 <input type="color" id="clothing-color-input" value="#3b6ea5" /></label>
+          <label>帽子の色 <input type="color" id="hat-color-input" value="#b5533c" /></label>
+        </div>
+        <button type="button" id="title-settings-close">閉じる</button>
+      </div>
+    </div>
+    <div id="opening-overlay" class="opening-overlay hidden">
+      <div class="opening-card">
+        <p class="opening-text">
+          ここは、まだ名前のない原っぱ。<br />
+          木を集め、家を建て、人が集まれば、少しずつ町になっていく。
+        </p>
+        <p class="opening-goal">📋 最初の目標：住居を1つ建てる</p>
+        <button type="button" id="opening-continue">はじめる</button>
+      </div>
+    </div>
+    <div id="onboarding-overlay" class="onboarding-overlay hidden">
+      <div class="onboarding-card">
+        <h2>ようこそ、ローポリタウンビルダーへ</h2>
+        <ul>
+          <li><strong>WASD / 矢印キー</strong>：移動</li>
+          <li><strong>クリック</strong>：タイルを選んで建築（プレビュー表示）</li>
+          <li><strong>Rキー</strong>：建築プレビューを回転</li>
+          <li><strong>Esc / 右クリック</strong>：建築をキャンセル</li>
+          <li><strong>Eキー</strong>：ベッド・木・お店などを操作</li>
+          <li><strong>Escキー</strong>：住居の外に出る</li>
+        </ul>
+        <button type="button" id="onboarding-close">はじめる</button>
+      </div>
+    </div>
     <div id="progression-modal" class="progression-modal hidden">
       <div class="progression-modal-card">
         <div class="progression-modal-header">
@@ -46,20 +119,6 @@
         </div>
       </div>
     </div>
-    <div id="onboarding-overlay" class="onboarding-overlay hidden">
-      <div class="onboarding-card">
-        <h2>ようこそ、ローポリタウンビルダーへ</h2>
-        <ul>
-          <li><strong>WASD / 矢印キー</strong>：移動</li>
-          <li><strong>クリック</strong>：タイルを選んで建築（プレビュー表示）</li>
-          <li><strong>Rキー</strong>：建築プレビューを回転</li>
-          <li><strong>Esc / 右クリック</strong>：建築をキャンセル</li>
-          <li><strong>Eキー</strong>：ベッド・木・お店などを操作</li>
-          <li><strong>Escキー</strong>：住居の外に出る</li>
-        </ul>
-        <button type="button" id="onboarding-close">はじめる</button>
-      </div>
-    </div>
     <button type="button" id="exit-building-button" class="exit-building-button hidden">
       外に出る (Esc)
     </button>
@@ -68,12 +127,6 @@
     <div id="celebration-overlay" class="celebration-overlay hidden">
       <div id="celebration-text" class="celebration-text"></div>
     </div>
-    <div id="resource-panel" class="resource-panel">
-      <div>🪵 <span id="resource-wood">0</span></div>
-      <div>💰 <span id="resource-money">0</span></div>
-      <div>🌾 <span id="resource-food">0</span></div>
-    </div>
-    <canvas id="minimap-canvas" class="minimap" width="150" height="150"></canvas>
     <div id="touch-joystick" class="touch-joystick hidden">
       <div id="touch-joystick-knob" class="touch-joystick-knob"></div>
     </div>
@@ -87,29 +140,6 @@
         <button type="button" id="shop-buy-wood">木材10を買う (-20円)</button>
       </div>
       <button type="button" id="shop-close">閉じる</button>
-    </div>
-    <div id="player-panel" class="debug-panel">
-      <div class="debug-stats">
-        <div>時刻: <span id="stat-time">06:00</span></div>
-        <div class="sleepiness-row">
-          眠気:
-          <span id="sleepiness-bar" class="sleepiness-bar"><span id="sleepiness-bar-fill"></span></span>
-        </div>
-      </div>
-      <label class="debug-seed">
-        シード
-        <input type="number" id="seed-input" value="1" />
-      </label>
-      <div class="debug-character">
-        <label>服の色 <input type="color" id="clothing-color-input" value="#3b6ea5" /></label>
-        <label>帽子の色 <input type="color" id="hat-color-input" value="#b5533c" /></label>
-      </div>
-      <div class="debug-buttons">
-        <button type="button" id="save-button">保存</button>
-        <button type="button" id="load-button">読込</button>
-        <button type="button" id="reset-button">リセット</button>
-        <button type="button" id="mute-button">🔊</button>
-      </div>
     </div>
     <div id="debug-info-panel" class="debug-panel debug-info-panel hidden">
       <div class="debug-stats">
@@ -183,9 +213,6 @@
       <button type="button" id="context-remove">撤去</button>
       <button type="button" id="context-cancel">キャンセル</button>
     </div>
-    <button type="button" id="range-select-toggle" class="range-select-toggle" title="範囲選択して一括撤去">
-      範囲選択
-    </button>
     <div id="range-select-confirm" class="range-select-confirm hidden">
       <span id="range-select-count">0</span>個のタイルを撤去しますか？
       <button type="button" id="range-select-yes">撤去する</button>

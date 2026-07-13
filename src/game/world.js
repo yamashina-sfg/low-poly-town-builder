@@ -40,7 +40,7 @@ import { generateRoad, computeRoadConnections, ROAD_TYPES, getBridgeSurfaceHeigh
 import { generateWater } from '../water.js';
 import { removeInstance } from '../instancing.js';
 import { getWood, getMoney, getFood, setResources } from '../economy.js';
-import { saveTownToLocalStorage, loadTownFromLocalStorage } from '../save.js';
+import { saveTownToLocalStorage, loadTownFromLocalStorage, hasSaveData } from '../save.js';
 import { getIndoorTiles, getIndoorSpawnPosition, applyRoomVariantForSeed } from '../interior.js';
 import { getCurrentSeason } from '../season.js';
 import { getGameTime, isNightHours } from '../gameTime.js';
@@ -759,6 +759,12 @@ export function saveWorld(getPopulaceSnapshot) {
     getPopulaceSnapshot?.(),
   );
 }
+
+/**
+ * フェーズ28：タイトル画面の「つづきから」ボタンを有効化してよいか
+ * （＝読み込めるセーブデータが存在するか）の判定に使う。
+ */
+export { hasSaveData };
 
 /**
  * restorePopulaceは、populace.jsのrestorePopulace（保存されていたNPCの

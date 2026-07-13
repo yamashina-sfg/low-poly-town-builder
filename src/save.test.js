@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from 'vitest';
-import { serializeTown, saveTownToLocalStorage, loadTownFromLocalStorage } from './save.js';
+import { serializeTown, saveTownToLocalStorage, loadTownFromLocalStorage, hasSaveData } from './save.js';
 import { getProceduralTileType } from './chunkManager.js';
 
 const WORLD_SEED = 3;
@@ -132,5 +132,26 @@ describe('localStorageへの保存・読込', () => {
   test('cellsを持たない旧形式・不正なデータもnullを返す', () => {
     localStorage.setItem('lowPolyTownBuilder:save', JSON.stringify({ seed: 1 }));
     expect(loadTownFromLocalStorage()).toBeNull();
+  });
+});
+
+describe('hasSaveData（フェーズ28：タイトル画面の「つづきから」を有効化してよいかの判定）', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  test('セーブデータが無ければfalse', () => {
+    expect(hasSaveData()).toBe(false);
+  });
+
+  test('セーブデータがあればtrue', () => {
+    const tiles = makeFakeTiles();
+    saveTownToLocalStorage((cb) => forEachFakeTile(tiles, cb), WORLD_SEED, { wood: 5, money: 10 });
+    expect(hasSaveData()).toBe(true);
+  });
+
+  test('壊れたデータの場合はfalse（読込不可＝無いものとして扱う）', () => {
+    localStorage.setItem('lowPolyTownBuilder:save', '{not valid json');
+    expect(hasSaveData()).toBe(false);
   });
 });
