@@ -19,6 +19,7 @@ import { showStatusMessage } from './statusMessage.js';
 import { updateResourcePanel } from './resourcePanel.js';
 import { spawnFloatingNumber } from './floatingNumbers.js';
 import { playBuildSound, playRemoveSound, playDeniedSound } from '../ambientAudio.js';
+import { notifyTileHovered, notifyBuildMenuOpened } from './tutorial.js';
 import {
   initBuildPreview,
   startPreview,
@@ -287,6 +288,7 @@ function setRangeSelectMode(enabled) {
 
 function handlePointerMove(event) {
   const tile = getIntersectedTile(event);
+  if (tile) notifyTileHovered();
 
   if (rangeSelectMode) {
     if (rangeSelectStartTile && tile) {
@@ -360,6 +362,7 @@ function handleClick(event) {
 
   if (isIndoorMode()) {
     // 屋内の家具は既存の即時設置フローのまま（プレビュー・移動/撤去メニューは屋外のみ）。
+    notifyBuildMenuOpened();
     showBuildMenu(event.clientX, event.clientY, (type) => {
       if (!canAfford(type)) {
         showStatusMessage('木材またはお金が足りない');
@@ -384,6 +387,7 @@ function handleClick(event) {
 
   // 地形系（更地・木・道・水・橋など）は、これまで通りクリックで建築メニューが
   // 開き、上書きできる（水タイルに橋を架ける操作もここを通る）。
+  notifyBuildMenuOpened();
   showBuildMenu(event.clientX, event.clientY, (type) => {
     if (getCurrentLockedTypes().includes(type)) {
       showStatusMessage('まだ解放されていません');

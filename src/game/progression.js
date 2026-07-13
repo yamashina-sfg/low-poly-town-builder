@@ -10,6 +10,7 @@ import { getTotalWoodCollected, addWood, addMoney } from '../economy.js';
 import { showStatusMessage } from './statusMessage.js';
 import { triggerCelebration } from './celebrationEffect.js';
 import { playCelebrationSound } from '../ambientAudio.js';
+import { notifyQuestCompleted } from './tutorial.js';
 
 // ------------------------------------------------------------------
 // 純粋関数（テストしやすいよう、DOM/他モジュールの状態に依存しない形で分離）
@@ -307,6 +308,7 @@ export function updateProgression() {
     if (quest.reward.wood) addWood(quest.reward.wood);
     if (quest.reward.money) addMoney(quest.reward.money);
     showStatusMessage(`クエスト達成: ${quest.label}（報酬: ${formatReward(quest.reward)}）🎯`);
+    notifyQuestCompleted(quest.id);
   });
 
   const newAchievements = evaluateNewAchievements(fullState, unlockedAchievementIds);
@@ -326,7 +328,7 @@ export function getCurrentLockedTypes() {
 
 /**
  * 進行状況モーダル（町ランク・クエスト・実績一覧）の開閉ボタンを配線する。
- * main.jsの初期化処理から一度だけ呼ぶ想定（onboarding.jsと同じ自己完結パターン）。
+ * main.jsの初期化処理から一度だけ呼ぶ想定（tutorial.jsと同じ自己完結パターン）。
  */
 export function initProgressionPanel() {
   const modal = document.getElementById('progression-modal');

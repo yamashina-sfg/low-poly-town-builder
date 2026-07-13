@@ -503,55 +503,26 @@ canvas {
   opacity: 0.85;
 }
 
-.onboarding-overlay {
+/* フェーズ29：段階的チュートリアルの一発ヒント（コーチマーク）。
+   #action-prompt（Eキーの操作案内）と重ならないよう、その少し上に置く。 */
+.tutorial-hint {
   position: fixed;
-  inset: 0;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
-}
-
-.onboarding-overlay.hidden {
-  display: none;
-}
-
-.onboarding-card {
-  max-width: 360px;
-  padding: 24px 28px;
-  background: rgba(30, 40, 30, 0.97);
+  bottom: 116px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  padding: 8px 18px;
+  border-radius: 8px;
+  background: rgba(60, 90, 60, 0.9);
   color: #fff;
   font-family: system-ui, sans-serif;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
 }
 
-.onboarding-card h2 {
-  margin-top: 0;
-  font-size: 18px;
-}
-
-.onboarding-card ul {
-  padding-left: 20px;
-  line-height: 1.8;
-}
-
-.onboarding-card button {
-  width: 100%;
-  padding: 10px;
-  margin-top: 8px;
-  border: none;
-  border-radius: 8px;
-  background: #6fae5c;
-  color: #fff;
-  font-size: 15px;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-.onboarding-card button:hover {
-  background: #7fc06c;
+.tutorial-hint.hidden {
+  display: none;
 }
 
 /* フェーズ28：タイトル画面（背景は実際の3Dシーンをカメラ演出付きで表示する

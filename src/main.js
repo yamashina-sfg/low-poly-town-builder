@@ -76,7 +76,7 @@ import {
   getCurrentLockedTypes,
   initProgressionPanel,
 } from './game/progression.js';
-import { initOnboarding } from './game/onboarding.js';
+import { initTutorial, notifyPlayerMoved } from './game/tutorial.js';
 import { initTouchControls } from './game/touchControls.js';
 import { initTitleScreen } from './game/titleScreen.js';
 import { showOpeningSequence } from './game/opening.js';
@@ -290,7 +290,7 @@ function prepareOutdoorDawnView() {
 function revealGameplay() {
   gameStarted = true;
   gameHudEl?.classList.remove('hidden');
-  initOnboarding();
+  initTutorial();
 }
 
 function handleNewGame() {
@@ -368,6 +368,7 @@ function animate() {
     updateInteractionTarget();
 
     const isMoving = updateMovementInput(delta);
+    if (isMoving) notifyPlayerMoved();
 
     // 水タイルにときどききらめきパーティクルを出す
     const waterTiles = getWaterTiles();
